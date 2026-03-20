@@ -2,10 +2,10 @@
 
 const { searchProducts } = require("../../services/shopifyService");
 
-// 🔥 In-memory session store (later replace with DB/Redis)
+// 🔥 SESSION STORE
 const userSessions = {};
 
-// 🔥 BRAND CLASSIFICATION
+// 🔥 CLASSIFY PRODUCT TYPE
 function classifyProduct(title) {
   const t = title.toLowerCase();
 
@@ -16,7 +16,7 @@ function classifyProduct(title) {
   return "standard";
 }
 
-// 🔥 FORMAT RESPONSE MESSAGE
+// 🔥 FORMAT RESPONSE WITH URL
 function formatProductList(products, query) {
   let premium = [];
   let oem = [];
@@ -43,10 +43,12 @@ function formatProductList(products, query) {
     if (list.length === 0) return;
 
     message += `${title}\n`;
+
     list.forEach(item => {
-      message += `${item.index}. ${item.title} - PKR ${item.price}\n`;
+      message += `${item.index}. ${item.title}\n`;
+      message += `💰 PKR ${item.price}\n`;
+      message += `🔗 ${item.url}\n\n`;
     });
-    message += "\n";
   };
 
   addSection("🥇 Premium Options:", premium);
@@ -59,13 +61,11 @@ function formatProductList(products, query) {
   return message;
 }
 
-// 🔥 MAIN FLOW HANDLER
+// 🔥 MAIN FLOW
 async function handleAutoPartsFlow(userId, message, aiData) {
   const session = userSessions[userId] || {};
 
-  // ==============================
-  // STEP 1: FIRST QUERY (SEARCH)
-  // ==============================
+  // STEP 1: SEARCH
   if (!session.step) {
     const results = await searchProducts(aiData);
 
@@ -82,9 +82,7 @@ async function handleAutoPartsFlow(userId, message, aiData) {
     return formatProductList(results, aiData);
   }
 
-  // ==============================
-  // STEP 2: PRODUCT SELECTION
-  // ==============================
+  // STEP 2: SELECT
   if (session.step === "SELECTING") {
     const index = parseInt(message);
 
@@ -99,18 +97,16 @@ async function handleAutoPartsFlow(userId, message, aiData) {
 
     return `🛒 *Order Summary:*\n\n` +
       `📦 ${selectedProduct.title}\n` +
-      `💰 PKR ${selectedProduct.price}\n\n` +
+      `💰 PKR ${selectedProduct.price}\n` +
+      `🔗 ${selectedProduct.url}\n\n` +
       `👉 Reply *YES* to confirm order\n👉 Reply *NO* to cancel`;
   }
 
-  // ==============================
-  // STEP 3: CONFIRMATION
-  // ==============================
+  // STEP 3: CONFIRM
   if (session.step === "CONFIRMING") {
     if (message.toLowerCase() === "yes") {
       const product = session.selectedProduct;
 
-      // Reset session
       delete userSessions[userId];
 
       return `✅ *Order Confirmed!*\n\n` +
