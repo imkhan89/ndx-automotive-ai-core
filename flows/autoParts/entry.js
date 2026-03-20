@@ -1,9 +1,7 @@
-// FILE: flows/autoParts/entry.js
-
 const stateRepository = require("../../state/stateRepository");
 const { parseUserInput } = require("../../services/aiParser");
 
-// Mock product database (will be replaced by Shopify later)
+// 🔧 Mock products (replace with Shopify later)
 function getMockProducts(part) {
   return [
     {
@@ -19,101 +17,129 @@ function getMockProducts(part) {
   ];
 }
 
-// MAIN ENTRY FUNCTION
+// 🚀 MAIN FLOW FUNCTION
 async function autoPartsFlow(message, userId) {
-  const userState = stateRepository.getState(userId);
+  try {
+    let userState = stateRepository.getState(userId);
 
-  // 🟢 STEP 1: NEW SEARCH (NO STATE OR RESET)
-  if (!userState || userState.step === "start") {
-    const aiData = await parseUserInput(message);
+    // 🔁 FORCE RESET IF USER TYPES NEW SEARCH
+    if (
+      message.toLowerCase().includes("filter") ||
+      message.toLowerCase().includes("brake") ||
+      message.toLowerCase().includes("oil") ||
+      message.toLowerCase().includes("plug")
+    ) {
+      stateRepository.clearState(userId);
+      userState = null;
+    }
 
-    if (!aiData || !aiData.part) {
+    // 🟢 STEP 1 — AI SEARCH
+    if (!userState || userState.step === "start") {
+      const aiData = await parseUserInput(message);
+
+      console.log("AI DATA:", aiData); // 🔍 DEBUG LOG
+
+      // ❌ AI FAILED
+      if (!aiData || !aiData.part) {
+        return {
+          reply:
+            "⚠️ Could not understand.\n\nTry like:\nHonda Civic 2016 brake pads",
+        };
+      }
+
+      const make = aiData.make || "Unknown";
+      const model = aiData.model || "";
+      const part = aiData.part;
+
+      const products = getMockProducts(part);
+
+      // 💾 SAVE STATE
+      stateRepository.setState(userId, {
+        step: "awaiting_selection",
+        make,
+        model,
+        part,
+        products,
+      });
+
+      // 📦 BUILD RESPONSE
+      let reply = `🔍 Product Search: ${part}\n🚗 Vehicle: ${make} ${model}\n\nAvailable Options:\n`;
+
+      products.forEach((p) => {
+        reply += `${p.id}. ${p.name} - PKR ${p.price}\n`;
+      });
+
+      reply += `\nReply with option number to proceed.`;
+
+      return { reply };
+    }
+
+    // 🟡 STEP 2 — SELECTION
+    if (userState.step === "awaiting_selection") {
+      const selectedId = parseInt(message);
+
+      const selectedProduct = userState.products.find(
+        (p) => p.id === selectedId
+      );
+
+      if (!selectedProduct) {
+        return {
+          reply: "⚠️ Invalid option. Please reply with a valid number (1 or 2).",
+        };
+      }
+
+      // 💾 SAVE STATE
+      stateRepository.setState(userId, {
+        ...userState,
+        step: "awaiting_confirmation",
+        selectedProduct,
+      });
+
       return {
-        reply: "⚠️ Could not understand. Please try again.",
+        reply: `✅ Selected: ${selectedProduct.name}\nPrice: PKR ${selectedProduct.price}\n\nConfirm order? (Yes/No)`,
       };
     }
 
-    const { make, model, part } = aiData;
+    // 🔵 STEP 3 — CONFIRMATION
+    if (userState.step === "awaiting_confirmation") {
+      const msg = message.toLowerCase();
 
-    const products = getMockProducts(part);
+      if (msg === "yes") {
+        stateRepository.clearState(userId);
 
-    // Save state
-    stateRepository.setState(userId, {
-      step: "awaiting_selection",
-      make,
-      model,
-      part,
-      products,
-    });
+        return {
+          reply:
+            "🎉 Order confirmed!\nOur team will contact you shortly.",
+        };
+      }
 
-    let optionsText = `🔍 Product Search: ${part}\n🚗 Vehicle: ${make} ${model}\n\nAvailable Options:\n`;
+      if (msg === "no") {
+        stateRepository.clearState(userId);
 
-    products.forEach((p) => {
-      optionsText += `${p.id}. ${p.name} - PKR ${p.price}\n`;
-    });
+        return {
+          reply:
+            "❌ Order cancelled.\nYou can search again anytime.",
+        };
+      }
 
-    optionsText += `\nReply with option number to proceed.`;
-
-    return { reply: optionsText };
-  }
-
-  // 🟡 STEP 2: USER SELECTS PRODUCT
-  if (userState.step === "awaiting_selection") {
-    const selectedId = parseInt(message);
-
-    const selectedProduct = userState.products.find(
-      (p) => p.id === selectedId
-    );
-
-    if (!selectedProduct) {
       return {
-        reply: "⚠️ Invalid option. Please select a valid number.",
+        reply: "⚠️ Please reply with Yes or No.",
       };
     }
 
-    // Save selection
-    stateRepository.setState(userId, {
-      ...userState,
-      step: "awaiting_confirmation",
-      selectedProduct,
-    });
+    // 🔁 FALLBACK RESET
+    stateRepository.clearState(userId);
 
     return {
-      reply: `✅ Selected: ${selectedProduct.name}\nPrice: PKR ${selectedProduct.price}\n\nConfirm order? (Yes/No)`,
+      reply: "⚠️ Session reset. Please start again.",
     };
-  }
-
-  // 🔵 STEP 3: CONFIRMATION
-  if (userState.step === "awaiting_confirmation") {
-    const msg = message.toLowerCase();
-
-    if (msg === "yes") {
-      stateRepository.clearState(userId);
-
-      return {
-        reply: "🎉 Order confirmed!\nOur team will contact you shortly.",
-      };
-    }
-
-    if (msg === "no") {
-      stateRepository.clearState(userId);
-
-      return {
-        reply: "❌ Order cancelled.\nYou can search again anytime.",
-      };
-    }
+  } catch (error) {
+    console.error("FLOW ERROR:", error);
 
     return {
-      reply: "⚠️ Please reply with Yes or No.",
+      reply: "⚠️ Server error. Please try again.",
     };
   }
-
-  // 🔁 FALLBACK (RESET FLOW)
-  stateRepository.clearState(userId);
-
-  return {
-    reply: "⚠️ Session reset. Please start again.",
-  };
 }
 
 module.exports = { autoPartsFlow };
