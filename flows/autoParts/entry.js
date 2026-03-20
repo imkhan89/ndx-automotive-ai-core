@@ -1,144 +1,76 @@
-const stateRepository = require("../../state/stateRepository");
 const { parseUserInput } = require("../../services/aiParser");
 
-// 🔧 Mock products (replace with Shopify later)
-function getMockProducts(part) {
-  return [
-    {
-      id: 1,
-      name: `Genuine ${part}`,
-      price: 2500,
-    },
-    {
-      id: 2,
-      name: `Aftermarket ${part}`,
-      price: 1800,
-    },
-  ];
-}
-
-// 🚀 MAIN FLOW FUNCTION
-async function autoPartsFlow(message, userId) {
+async function autoPartsFlow(userMessage, userState) {
   try {
-    let userState = stateRepository.getState(userId);
+    console.log("USER MESSAGE:", userMessage);
 
-    // 🔁 FORCE RESET IF USER TYPES NEW SEARCH
-    if (
-      message.toLowerCase().includes("filter") ||
-      message.toLowerCase().includes("brake") ||
-      message.toLowerCase().includes("oil") ||
-      message.toLowerCase().includes("plug")
-    ) {
-      stateRepository.clearState(userId);
-      userState = null;
-    }
-
-    // 🟢 STEP 1 — AI SEARCH
-    if (!userState || userState.step === "start") {
-      const aiData = await parseUserInput(message);
-
-      console.log("AI DATA:", aiData); // 🔍 DEBUG LOG
-
-      // ❌ AI FAILED
-      if (!aiData || !aiData.part) {
-        return {
-          reply:
-            "⚠️ Could not understand.\n\nTry like:\nHonda Civic 2016 brake pads",
-        };
+    // Step 1: If selecting option
+    if (userState.step === "SELECT_OPTION") {
+      if (userMessage === "1") {
+        userState.selectedProduct = "Genuine Air Filter";
+        userState.price = 2500;
+      } else if (userMessage === "2") {
+        userState.selectedProduct = "Aftermarket Air Filter";
+        userState.price = 1800;
+      } else {
+        return "❌ Invalid option. Please select 1 or 2.";
       }
 
-      const make = aiData.make || "Unknown";
-      const model = aiData.model || "";
-      const part = aiData.part;
+      userState.step = "CONFIRM_ORDER";
 
-      const products = getMockProducts(part);
+      return `✅ Selected: ${userState.selectedProduct}
+Price: PKR ${userState.price}
 
-      // 💾 SAVE STATE
-      stateRepository.setState(userId, {
-        step: "awaiting_selection",
-        make,
-        model,
-        part,
-        products,
-      });
-
-      // 📦 BUILD RESPONSE
-      let reply = `🔍 Product Search: ${part}\n🚗 Vehicle: ${make} ${model}\n\nAvailable Options:\n`;
-
-      products.forEach((p) => {
-        reply += `${p.id}. ${p.name} - PKR ${p.price}\n`;
-      });
-
-      reply += `\nReply with option number to proceed.`;
-
-      return { reply };
+Confirm order? (Yes/No)`;
     }
 
-    // 🟡 STEP 2 — SELECTION
-    if (userState.step === "awaiting_selection") {
-      const selectedId = parseInt(message);
+    // Step 2: Confirm order
+    if (userState.step === "CONFIRM_ORDER") {
+      if (userMessage.toLowerCase() === "yes") {
+        userState.step = "COMPLETED";
 
-      const selectedProduct = userState.products.find(
-        (p) => p.id === selectedId
-      );
-
-      if (!selectedProduct) {
-        return {
-          reply: "⚠️ Invalid option. Please reply with a valid number (1 or 2).",
-        };
+        return "🎉 Order confirmed!\nOur team will contact you shortly.";
+      } else {
+        userState.step = "START";
+        return "❌ Order cancelled. Start again.";
       }
-
-      // 💾 SAVE STATE
-      stateRepository.setState(userId, {
-        ...userState,
-        step: "awaiting_confirmation",
-        selectedProduct,
-      });
-
-      return {
-        reply: `✅ Selected: ${selectedProduct.name}\nPrice: PKR ${selectedProduct.price}\n\nConfirm order? (Yes/No)`,
-      };
     }
 
-    // 🔵 STEP 3 — CONFIRMATION
-    if (userState.step === "awaiting_confirmation") {
-      const msg = message.toLowerCase();
+    // Step 3: New search
+    const aiData = await parseUserInput(userMessage);
 
-      if (msg === "yes") {
-        stateRepository.clearState(userId);
+    console.log("AI DATA:", aiData);
 
-        return {
-          reply:
-            "🎉 Order confirmed!\nOur team will contact you shortly.",
-        };
-      }
-
-      if (msg === "no") {
-        stateRepository.clearState(userId);
-
-        return {
-          reply:
-            "❌ Order cancelled.\nYou can search again anytime.",
-        };
-      }
-
-      return {
-        reply: "⚠️ Please reply with Yes or No.",
-      };
+    if (!aiData) {
+      return "⚠️ Could not understand. Please try again.";
     }
 
-    // 🔁 FALLBACK RESET
-    stateRepository.clearState(userId);
+    const make = aiData.make || "Unknown";
+    const model = aiData.model || "";
+    const part = aiData.part || "";
 
-    return {
-      reply: "⚠️ Session reset. Please start again.",
-    };
+    // 🔥 FIX: NO YEAR REQUIRED
+    if (!make || !model || !part) {
+      return `Please provide:
+Make Model Product
+
+Example:
+Honda Civic brake pads`;
+    }
+
+    userState.step = "SELECT_OPTION";
+
+    return `🔍 Product Search: ${part}
+🚗 Vehicle: ${make} ${model}
+
+Available Options:
+1. Genuine ${part} - PKR 2500
+2. Aftermarket ${part} - PKR 1800
+
+Reply with option number to proceed.`;
   } catch (error) {
     console.error("FLOW ERROR:", error);
-
-    return {
-      reply: "⚠️ Server error. Please try again.",
-    };
+    return "⚠️ Server error. Please try again.";
   }
 }
 
