@@ -5,10 +5,8 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 
-// 🔥 ROUTES
+// 🔥 IMPORT ROUTES
 const whatsappWebhook = require("./routes/whatsappWebhook");
-
-// 🔥 AI TEST (OPTIONAL BUT USEFUL)
 const aiParser = require("./services/aiParser");
 
 // ==============================
@@ -17,7 +15,7 @@ const aiParser = require("./services/aiParser");
 app.use(express.json());
 
 // ==============================
-// 🏠 ROOT ROUTE
+// 🏠 ROOT
 // ==============================
 app.get("/", (req, res) => {
   res.send("🚀 NDX Automotive AI Server Running");
@@ -35,31 +33,26 @@ app.get("/health", (req, res) => {
 });
 
 // ==============================
-// 🧠 TEST AI ENDPOINT
+// 🧠 TEST AI
 // ==============================
 app.post("/test-ai", async (req, res) => {
   try {
     const { message } = req.body;
 
     if (!message) {
-      return res.status(400).json({
-        error: "Message is required"
-      });
+      return res.status(400).json({ error: "Message is required" });
     }
 
-    const result = await aiParser(message);
+    const parsed = await aiParser(message);
 
     res.json({
       input: message,
-      parsed: result
+      parsed
     });
 
   } catch (error) {
-    console.error("❌ AI Test Error:", error);
-
-    res.status(500).json({
-      error: "AI parsing failed"
-    });
+    console.error("❌ AI Error:", error);
+    res.status(500).json({ error: "AI parsing failed" });
   }
 });
 
@@ -69,23 +62,25 @@ app.post("/test-ai", async (req, res) => {
 app.use("/webhook", whatsappWebhook);
 
 // ==============================
-// ❌ 404 HANDLER
+// 🧪 DEBUG ROUTE (IMPORTANT)
 // ==============================
-app.use((req, res) => {
-  res.status(404).json({
-    error: "Route not found"
-  });
+app.get("/webhook-test", (req, res) => {
+  res.send("✅ Webhook route is working");
 });
 
 // ==============================
-// 🚨 GLOBAL ERROR HANDLER
+// ❌ 404 HANDLER
+// ==============================
+app.use((req, res) => {
+  res.status(404).send("Not Found");
+});
+
+// ==============================
+// 🚨 ERROR HANDLER
 // ==============================
 app.use((err, req, res, next) => {
   console.error("❌ Server Error:", err);
-
-  res.status(500).json({
-    error: "Internal Server Error"
-  });
+  res.status(500).json({ error: "Internal Server Error" });
 });
 
 // ==============================
