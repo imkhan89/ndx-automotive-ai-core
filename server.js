@@ -6,21 +6,21 @@ const app = express();
 app.use(express.json());
 
 // ==============================
-// ROOT ROUTE (CHECK SERVER)
+// ROOT ROUTE (SERVER CHECK)
 // ==============================
 app.get("/", (req, res) => {
   res.send("🚀 ndx Automotive AI is LIVE");
 });
 
 // ==============================
-// WEBHOOK GET (FOR BROWSER TEST)
+// WEBHOOK GET (BROWSER TEST)
 // ==============================
 app.get("/webhook", (req, res) => {
-  res.send("✅ Webhook is working. Use POST to send data.");
+  res.send("✅ Webhook is working. Use POST request.");
 });
 
 // ==============================
-// SIMPLE IN-MEMORY STATE
+// IN-MEMORY USER STATE
 // ==============================
 const userState = {};
 
@@ -28,16 +28,17 @@ const userState = {};
 // WEBHOOK POST (MAIN LOGIC)
 // ==============================
 app.post("/webhook", (req, res) => {
-  const message = (req.body.message || "").toLowerCase();
-  const userId = req.body.userId || "test_user";
+  const message = (req.body.message || "").toLowerCase().trim();
+  const userId = req.body.userId || "default_user";
 
   console.log("📩 Incoming:", message);
 
-  // Initialize user state
+  // Initialize state if not exists
   if (!userState[userId]) {
     userState[userId] = {
       step: "start",
-      lastOptions: []
+      lastOptions: [],
+      selectedProduct: null
     };
   }
 
@@ -48,7 +49,7 @@ app.post("/webhook", (req, res) => {
   // FLOW LOGIC
   // ==============================
 
-  // STEP 1: PRODUCT SEARCH
+  // STEP 1 — SEARCH
   if (message.includes("swift") && message.includes("air filter")) {
     state.step = "awaiting_selection";
     state.lastOptions = [
@@ -66,20 +67,27 @@ Available Options:
 Reply with option number to proceed.`;
   }
 
-  // STEP 2: OPTION SELECTION
-  else if (state.step === "awaiting_selection" && (message === "1" || message === "2")) {
+  // STEP 2 — SELECT OPTION
+  else if (
+    state.step === "awaiting_selection" &&
+    (message === "1" || message === "2")
+  ) {
     const selected = state.lastOptions[parseInt(message) - 1];
 
-    state.step = "awaiting_confirmation";
-    state.selectedProduct = selected;
+    if (!selected) {
+      reply = "Invalid selection. Please choose 1 or 2.";
+    } else {
+      state.step = "awaiting_confirmation";
+      state.selectedProduct = selected;
 
-    reply = `✅ Selected: ${selected.name}
+      reply = `✅ Selected: ${selected.name}
 Price: PKR ${selected.price}
 
 Confirm order? (Yes/No)`;
+    }
   }
 
-  // STEP 3: CONFIRMATION
+  // STEP 3 — CONFIRM ORDER
   else if (state.step === "awaiting_confirmation" && message === "yes") {
     state.step = "completed";
 
@@ -88,19 +96,23 @@ Confirm order? (Yes/No)`;
 Our team will contact you shortly.`;
   }
 
-  // STEP 4: CANCEL
+  // STEP 4 — CANCEL ORDER
   else if (state.step === "awaiting_confirmation" && message === "no") {
     state.step = "start";
+    state.selectedProduct = null;
 
     reply = `❌ Order cancelled.
 
 You can search again anytime.`;
   }
 
-  // STEP 5: FALLBACK
+  // STEP 5 — EMPTY INPUT
   else if (!message) {
-    reply = "Please send a message.";
-  } else {
+    reply = "Please send a valid message.";
+  }
+
+  // STEP 6 — FALLBACK
+  else {
     state.step = "start";
 
     reply = `Please provide:
