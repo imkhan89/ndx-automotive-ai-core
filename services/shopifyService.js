@@ -2,7 +2,7 @@
 
 const fetch = require("node-fetch");
 
-// 🔥 PART DICTIONARY (CORE ENGINE)
+// 🔥 PART DICTIONARY
 const PART_DICTIONARY = {
   "air filter": ["air filter", "air filter element"],
   "oil filter": ["oil filter"],
@@ -26,7 +26,7 @@ const PART_DICTIONARY = {
   "monogram emblem": ["monogram", "emblem"]
 };
 
-// 🔥 REMOVE BRAND / VARIANTS
+// 🔥 CLEAN PART NAME
 function cleanPartName(part) {
   return part
     .replace(/denso|genuine|imported|original|oem/gi, "")
@@ -40,7 +40,7 @@ function normalize(text) {
   return text.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-// 🔥 EXTRACT PART FROM TITLE (POSITION BASED)
+// 🔥 EXTRACT PART FROM TITLE
 function extractPartFromTitle(title) {
   const lowerTitle = title.toLowerCase();
 
@@ -51,21 +51,19 @@ function extractPartFromTitle(title) {
   return cleanPartName(partSection);
 }
 
-// 🔥 MATCH PART USING DICTIONARY
+// 🔥 MATCH PART
 function matchPart(queryPart, productPart) {
   const normalizedQuery = normalize(queryPart);
-
   const validParts = PART_DICTIONARY[normalizedQuery] || [normalizedQuery];
 
   return validParts.some(p => productPart.includes(p));
 }
 
-// 🔥 MAIN MATCH FUNCTION
+// 🔥 FINAL MATCH FUNCTION
 function isMatch(product, query) {
   const title = product.title.toLowerCase();
 
   const productPart = extractPartFromTitle(title);
-
   if (!productPart) return false;
 
   const partMatch = matchPart(query.part, productPart);
@@ -75,7 +73,7 @@ function isMatch(product, query) {
   return partMatch && makeMatch && modelMatch;
 }
 
-// 🔥 FETCH PRODUCTS FROM SHOPIFY
+// 🔥 FETCH PRODUCTS
 async function fetchProducts() {
   const SHOP = process.env.SHOPIFY_STORE_URL;
   const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
@@ -90,22 +88,23 @@ async function fetchProducts() {
   });
 
   const data = await response.json();
-
   return data.products || [];
 }
 
 // 🔥 MAIN SEARCH FUNCTION
 async function searchProducts(query) {
+  const STORE_URL = process.env.STORE_URL || "https://ndestore.com";
+
   const products = await fetchProducts();
 
   const matched = products.filter(product => isMatch(product, query));
 
-  // 🔥 FORMAT RESULTS
   return matched.map(product => ({
     id: product.id,
     title: product.title,
     price: product.variants[0]?.price || "N/A",
-    image: product.image?.src || null
+    image: product.image?.src || null,
+    url: `${STORE_URL}/products/${product.handle}`
   }));
 }
 
