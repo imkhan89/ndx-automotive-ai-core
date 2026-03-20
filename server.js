@@ -1,66 +1,98 @@
+// FILE: server.js
+
 require("dotenv").config();
 
 const express = require("express");
-const bodyParser = require("body-parser");
-
-const { autoPartsFlow } = require("./flows/autoParts/entry");
-
 const app = express();
 
-// Middleware
-app.use(bodyParser.json());
+// 🔥 ROUTES
+const whatsappWebhook = require("./routes/whatsappWebhook");
 
-// 🌐 ROOT ROUTE (Health Check)
+// 🔥 AI TEST (OPTIONAL BUT USEFUL)
+const aiParser = require("./services/aiParser");
+
+// ==============================
+// 🔧 MIDDLEWARE
+// ==============================
+app.use(express.json());
+
+// ==============================
+// 🏠 ROOT ROUTE
+// ==============================
 app.get("/", (req, res) => {
-  res.send("🚀 ndx Automotive AI is LIVE");
+  res.send("🚀 NDX Automotive AI Server Running");
 });
 
-// 🧠 AI TEST ROUTE (VERY IMPORTANT FOR DEBUG)
-app.get("/test-ai", async (req, res) => {
-  try {
-    const { parseUserInput } = require("./services/aiParser");
-
-    const result = await parseUserInput("Toyota Corolla air filter");
-
-    console.log("AI TEST RESULT:", result);
-
-    res.json(result);
-  } catch (error) {
-    console.error("AI TEST ERROR:", error);
-    res.status(500).json({ error: "AI test failed" });
-  }
+// ==============================
+// 🧪 HEALTH CHECK
+// ==============================
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    service: "NDX Automotive AI",
+    time: new Date()
+  });
 });
 
-// 📩 MAIN WEBHOOK (POST)
-app.post("/webhook", async (req, res) => {
+// ==============================
+// 🧠 TEST AI ENDPOINT
+// ==============================
+app.post("/test-ai", async (req, res) => {
   try {
-    const { message, userId } = req.body;
+    const { message } = req.body;
 
-    // ❌ VALIDATION
-    if (!message || !userId) {
-      return res.status(200).json({
-        reply: "⚠️ Please send a valid message.",
+    if (!message) {
+      return res.status(400).json({
+        error: "Message is required"
       });
     }
 
-    console.log("Incoming Message:", message, "User:", userId);
+    const result = await aiParser(message);
 
-    // 🚀 PROCESS FLOW
-    const response = await autoPartsFlow(message, userId);
+    res.json({
+      input: message,
+      parsed: result
+    });
 
-    return res.status(200).json(response);
   } catch (error) {
-    console.error("WEBHOOK ERROR:", error);
+    console.error("❌ AI Test Error:", error);
 
-    return res.status(200).json({
-      reply: "⚠️ Server error. Please try again.",
+    res.status(500).json({
+      error: "AI parsing failed"
     });
   }
 });
 
+// ==============================
+// 📲 WHATSAPP WEBHOOK
+// ==============================
+app.use("/webhook", whatsappWebhook);
+
+// ==============================
+// ❌ 404 HANDLER
+// ==============================
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Route not found"
+  });
+});
+
+// ==============================
+// 🚨 GLOBAL ERROR HANDLER
+// ==============================
+app.use((err, req, res, next) => {
+  console.error("❌ Server Error:", err);
+
+  res.status(500).json({
+    error: "Internal Server Error"
+  });
+});
+
+// ==============================
 // 🚀 START SERVER
-const PORT = process.env.PORT || 8080;
+// ==============================
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
