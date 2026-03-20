@@ -22,7 +22,7 @@ async function autoPartsFlow(userMessage, userState) {
       const product = userState.products[index];
 
       userState.selectedProduct = product.title;
-      userState.price = product.variants[0].price;
+      userState.price = product.price;
 
       userState.step = "CONFIRM_ORDER";
 
@@ -36,7 +36,9 @@ Confirm order? (Yes/No)`;
     // STEP 2: CONFIRM ORDER
     // ===============================
     if (userState.step === "CONFIRM_ORDER") {
-      if (userMessage.toLowerCase() === "yes") {
+      const msg = userMessage.toLowerCase();
+
+      if (msg === "yes" || msg === "y") {
         userState.step = "COMPLETED";
 
         return `🎉 Order confirmed!
@@ -44,14 +46,18 @@ Product: ${userState.selectedProduct}
 Price: PKR ${userState.price}
 
 Our team will contact you shortly.`;
-      } else {
+      }
+
+      if (msg === "no" || msg === "n") {
         userState.step = "START";
         return "❌ Order cancelled. Start again.";
       }
+
+      return "Please reply with Yes or No.";
     }
 
     // ===============================
-    // STEP 3: NEW SEARCH (AI)
+    // STEP 3: NEW SEARCH (AI PARSING)
     // ===============================
     const aiData = await parseUserInput(userMessage);
 
@@ -85,7 +91,6 @@ Honda Civic brake pads`;
     userState.products = products;
     userState.step = "SELECT_OPTION";
 
-    // Safely handle 1 or 2 products
     const p1 = products[0];
     const p2 = products[1];
 
@@ -93,8 +98,8 @@ Honda Civic brake pads`;
 🚗 Vehicle: ${make} ${model}
 
 Available Options:
-1. ${p1.title} - PKR ${p1.variants[0].price}
-${p2 ? `2. ${p2.title} - PKR ${p2.variants[0].price}` : ""}
+1. ${p1.title} - PKR ${p1.price}
+${p2 ? `2. ${p2.title} - PKR ${p2.price}` : ""}
 
 Reply with option number to proceed.`;
   } catch (error) {
