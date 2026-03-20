@@ -1,76 +1,114 @@
-const axios = require("axios");
+// FILE: services/shopifyService.js
 
-const SHOP = process.env.SHOPIFY_STORE_URL;
-const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
+const fetch = require("node-fetch");
 
-// 🔥 OPTIONAL: synonym mapping (improves search accuracy)
-const synonyms = {
-  "air filter": ["air filter", "air cleaner", "engine air filter"],
-  "oil filter": ["oil filter", "engine oil filter"],
-  "brake pad": ["brake pad", "brake pads"],
+// 🔥 PART DICTIONARY (CORE ENGINE)
+const PART_DICTIONARY = {
+  "air filter": ["air filter", "air filter element"],
+  "oil filter": ["oil filter"],
+  "ac filter": ["ac filter", "cabin filter"],
+  "spark plug": ["spark plug", "plug"],
+  "headlight": ["head light", "headlight"],
+  "fog light": ["fog light"],
+  "back light": ["back light", "tail light"],
+  "radiator": ["radiator"],
+  "radiator bottle": ["radiator bottle", "coolant tank"],
+  "engine mounting": ["engine mounting", "engine mount"],
+  "control arm": ["control arm"],
+  "tie rod end": ["tie rod end"],
+  "ball joint": ["ball joint"],
+  "bumper": ["bumper"],
+  "fender liner": ["fender liner"],
+  "fender shield": ["fender shield"],
+  "fender clip": ["fender clip"],
+  "door handle": ["door handle"],
+  "side mirror": ["side mirror", "mirror"],
+  "monogram emblem": ["monogram", "emblem"]
 };
 
-function expandQuery(query) {
-  const lower = query.toLowerCase();
-
-  for (let key in synonyms) {
-    if (lower.includes(key)) {
-      return synonyms[key];
-    }
-  }
-
-  return lower.split(" ");
+// 🔥 REMOVE BRAND / VARIANTS
+function cleanPartName(part) {
+  return part
+    .replace(/denso|genuine|imported|original|oem/gi, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
+// 🔥 NORMALIZE TEXT
+function normalize(text) {
+  return text.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+// 🔥 EXTRACT PART FROM TITLE (POSITION BASED)
+function extractPartFromTitle(title) {
+  const lowerTitle = title.toLowerCase();
+
+  if (!lowerTitle.includes(" for ")) return null;
+
+  const partSection = lowerTitle.split(" for ")[0];
+
+  return cleanPartName(partSection);
+}
+
+// 🔥 MATCH PART USING DICTIONARY
+function matchPart(queryPart, productPart) {
+  const normalizedQuery = normalize(queryPart);
+
+  const validParts = PART_DICTIONARY[normalizedQuery] || [normalizedQuery];
+
+  return validParts.some(p => productPart.includes(p));
+}
+
+// 🔥 MAIN MATCH FUNCTION
+function isMatch(product, query) {
+  const title = product.title.toLowerCase();
+
+  const productPart = extractPartFromTitle(title);
+
+  if (!productPart) return false;
+
+  const partMatch = matchPart(query.part, productPart);
+  const makeMatch = title.includes(query.make.toLowerCase());
+  const modelMatch = title.includes(query.model.toLowerCase());
+
+  return partMatch && makeMatch && modelMatch;
+}
+
+// 🔥 FETCH PRODUCTS FROM SHOPIFY
+async function fetchProducts() {
+  const SHOP = process.env.SHOPIFY_STORE_URL;
+  const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
+
+  const url = `https://${SHOP}/admin/api/2023-10/products.json?limit=250`;
+
+  const response = await fetch(url, {
+    headers: {
+      "X-Shopify-Access-Token": TOKEN,
+      "Content-Type": "application/json"
+    }
+  });
+
+  const data = await response.json();
+
+  return data.products || [];
+}
+
+// 🔥 MAIN SEARCH FUNCTION
 async function searchProducts(query) {
-  try {
-    console.log("🔍 Shopify Search Query:", query);
+  const products = await fetchProducts();
 
-    const response = await axios.get(
-      `https://${SHOP}/admin/api/2024-01/products.json`,
-      {
-        headers: {
-          "X-Shopify-Access-Token": TOKEN,
-          "Content-Type": "application/json",
-        },
-        params: {
-          limit: 50, // fetch more for better matching
-        },
-      }
-    );
+  const matched = products.filter(product => isMatch(product, query));
 
-    const products = response.data.products;
-
-    if (!products || products.length === 0) {
-      console.log("⚠️ No products returned from Shopify");
-      return [];
-    }
-
-    const keywords = expandQuery(query);
-
-    console.log("🔑 Keywords:", keywords);
-
-    const filtered = products.filter((product) => {
-      const title = product.title.toLowerCase();
-
-      return keywords.some((word) => title.includes(word));
-    });
-
-    console.log("✅ Filtered Products Count:", filtered.length);
-
-    // Normalize output (important for flow consistency)
-    const cleaned = filtered.map((p) => ({
-      id: p.id,
-      title: p.title,
-      price: p.variants?.[0]?.price || "0",
-      url: `https://${SHOP}/products/${p.handle}`,
-    }));
-
-    return cleaned.slice(0, 2); // return top 2
-  } catch (error) {
-    console.error("❌ Shopify Error:", error.response?.data || error.message);
-    return [];
-  }
+  // 🔥 FORMAT RESULTS
+  return matched.map(product => ({
+    id: product.id,
+    title: product.title,
+    price: product.variants[0]?.price || "N/A",
+    image: product.image?.src || null
+  }));
 }
 
-module.exports = { searchProducts };
+module.exports = {
+  searchProducts
+};
