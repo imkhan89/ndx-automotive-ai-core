@@ -1,5 +1,3 @@
-// FILE: services/aiParser.js
-
 const OpenAI = require("openai");
 
 const client = new OpenAI({
@@ -8,29 +6,32 @@ const client = new OpenAI({
 
 async function parseUserInput(message) {
   try {
-    const prompt = `
-Extract structured automotive data from user message.
-
-Return JSON ONLY with:
-- make
-- model
-- year (optional)
-- part
-
-Message: "${message}"
-`;
-
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        {
+          role: "system",
+          content:
+            "Extract car make, model, year (if any), and part. Return ONLY valid JSON.",
+        },
+        {
+          role: "user",
+          content: message,
+        },
+      ],
       temperature: 0,
     });
 
-    const text = response.choices[0].message.content;
+    let text = response.choices[0].message.content;
+
+    console.log("RAW AI RESPONSE:", text);
+
+    // 🔥 CLEAN RESPONSE (IMPORTANT)
+    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
     return JSON.parse(text);
   } catch (error) {
-    console.error("AI Parser Error:", error);
+    console.error("AI Parser Error:", error.message);
     return null;
   }
 }
