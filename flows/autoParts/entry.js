@@ -1,20 +1,28 @@
 const { parseUserInput } = require("../../services/aiParser");
+const { searchProducts } = require("../../services/shopifyService");
 
 async function autoPartsFlow(userMessage, userState) {
   try {
     console.log("USER MESSAGE:", userMessage);
 
-    // Step 1: If selecting option
+    // ===============================
+    // STEP 1: SELECT PRODUCT OPTION
+    // ===============================
     if (userState.step === "SELECT_OPTION") {
-      if (userMessage === "1") {
-        userState.selectedProduct = "Genuine Air Filter";
-        userState.price = 2500;
-      } else if (userMessage === "2") {
-        userState.selectedProduct = "Aftermarket Air Filter";
-        userState.price = 1800;
-      } else {
-        return "❌ Invalid option. Please select 1 or 2.";
+      const index = parseInt(userMessage) - 1;
+
+      if (
+        isNaN(index) ||
+        !userState.products ||
+        !userState.products[index]
+      ) {
+        return "❌ Invalid option. Please select a valid number.";
       }
+
+      const product = userState.products[index];
+
+      userState.selectedProduct = product.title;
+      userState.price = product.variants[0].price;
 
       userState.step = "CONFIRM_ORDER";
 
@@ -24,19 +32,27 @@ Price: PKR ${userState.price}
 Confirm order? (Yes/No)`;
     }
 
-    // Step 2: Confirm order
+    // ===============================
+    // STEP 2: CONFIRM ORDER
+    // ===============================
     if (userState.step === "CONFIRM_ORDER") {
       if (userMessage.toLowerCase() === "yes") {
         userState.step = "COMPLETED";
 
-        return "🎉 Order confirmed!\nOur team will contact you shortly.";
+        return `🎉 Order confirmed!
+Product: ${userState.selectedProduct}
+Price: PKR ${userState.price}
+
+Our team will contact you shortly.`;
       } else {
         userState.step = "START";
         return "❌ Order cancelled. Start again.";
       }
     }
 
-    // Step 3: New search
+    // ===============================
+    // STEP 3: NEW SEARCH (AI)
+    // ===============================
     const aiData = await parseUserInput(userMessage);
 
     console.log("AI DATA:", aiData);
@@ -45,11 +61,10 @@ Confirm order? (Yes/No)`;
       return "⚠️ Could not understand. Please try again.";
     }
 
-    const make = aiData.make || "Unknown";
+    const make = aiData.make || "";
     const model = aiData.model || "";
     const part = aiData.part || "";
 
-    // 🔥 FIX: NO YEAR REQUIRED
     if (!make || !model || !part) {
       return `Please provide:
 Make Model Product
@@ -58,14 +73,28 @@ Example:
 Honda Civic brake pads`;
     }
 
+    // ===============================
+    // STEP 4: SHOPIFY SEARCH
+    // ===============================
+    const products = await searchProducts(part);
+
+    if (!products || products.length === 0) {
+      return `❌ No products found for "${part}".`;
+    }
+
+    userState.products = products;
     userState.step = "SELECT_OPTION";
+
+    // Safely handle 1 or 2 products
+    const p1 = products[0];
+    const p2 = products[1];
 
     return `🔍 Product Search: ${part}
 🚗 Vehicle: ${make} ${model}
 
 Available Options:
-1. Genuine ${part} - PKR 2500
-2. Aftermarket ${part} - PKR 1800
+1. ${p1.title} - PKR ${p1.variants[0].price}
+${p2 ? `2. ${p2.title} - PKR ${p2.variants[0].price}` : ""}
 
 Reply with option number to proceed.`;
   } catch (error) {
