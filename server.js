@@ -5,7 +5,9 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 
-// 🔥 IMPORT ROUTES
+// ==============================
+// 🔥 IMPORT ROUTES & SERVICES
+// ==============================
 const whatsappWebhook = require("./routes/whatsappWebhook");
 const aiParser = require("./services/aiParser");
 
@@ -15,10 +17,10 @@ const aiParser = require("./services/aiParser");
 app.use(express.json());
 
 // ==============================
-// 🏠 ROOT
+// 🏠 ROOT ROUTE (VERSION CHECK)
 // ==============================
 app.get("/", (req, res) => {
-  res.send("🚀 NDX Automotive AI Server Running");
+  res.send("🚀 NDX Automotive AI Server Running v2");
 });
 
 // ==============================
@@ -28,6 +30,7 @@ app.get("/health", (req, res) => {
   res.status(200).json({
     status: "OK",
     service: "NDX Automotive AI",
+    version: "v2",
     time: new Date()
   });
 });
@@ -62,7 +65,7 @@ app.post("/test-ai", async (req, res) => {
 app.use("/webhook", whatsappWebhook);
 
 // ==============================
-// 🧪 DEBUG ROUTE (IMPORTANT)
+// 🧪 DEBUG ROUTE (CRITICAL)
 // ==============================
 app.get("/webhook-test", (req, res) => {
   res.send("✅ Webhook route is working");
@@ -76,7 +79,7 @@ app.use((req, res) => {
 });
 
 // ==============================
-// 🚨 ERROR HANDLER
+// 🚨 GLOBAL ERROR HANDLER
 // ==============================
 app.use((err, req, res, next) => {
   console.error("❌ Server Error:", err);
