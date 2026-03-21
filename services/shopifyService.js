@@ -3,37 +3,32 @@
 const fetch = require("node-fetch");
 
 // ==============================
-// 🔧 NORMALIZE TEXT
+// 🔧 NORMALIZE
 // ==============================
 function normalize(text) {
   return text.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 // ==============================
-// 🧠 SCORE PRODUCT (SMART MATCH)
+// 🧠 SCORE PRODUCT
 // ==============================
 function scoreProduct(product, query) {
   const title = normalize(product.title);
 
   let score = 0;
 
-  // 🔥 PART MATCH (PRIMARY)
   const partWords = query.part.toLowerCase().split(" ");
   const partMatch = partWords.some(word => title.includes(word));
 
   if (partMatch) score += 60;
-
-  // 🚗 MAKE MATCH
   if (title.includes(query.make.toLowerCase())) score += 20;
-
-  // 🚘 MODEL MATCH
   if (title.includes(query.model.toLowerCase())) score += 20;
 
   return score;
 }
 
 // ==============================
-// 🔄 FETCH ALL PRODUCTS (PAGINATION)
+// 🔄 FETCH PRODUCTS (DEBUG MODE)
 // ==============================
 async function fetchProducts() {
   const SHOP = process.env.SHOPIFY_STORE_URL;
@@ -42,8 +37,13 @@ async function fetchProducts() {
   let allProducts = [];
   let url = `https://${SHOP}/admin/api/2023-10/products.json?limit=250`;
 
+  console.log("🌐 Shopify Store:", SHOP);
+  console.log("🔑 Token Exists:", !!TOKEN);
+
   try {
     while (url) {
+      console.log("➡️ Fetching URL:", url);
+
       const response = await fetch(url, {
         headers: {
           "X-Shopify-Access-Token": TOKEN,
@@ -51,17 +51,24 @@ async function fetchProducts() {
         }
       });
 
-      // ❌ API ERROR HANDLING
+      console.log("📡 Response Status:", response.status);
+
       if (!response.ok) {
-        const errText = await response.text();
-        console.error("❌ Shopify API Error:", errText);
+        const errorText = await response.text();
+        console.error("❌ Shopify API Error:", errorText);
         break;
       }
 
       const data = await response.json();
+
+      console.log(
+        "📦 Products fetched in this batch:",
+        data.products ? data.products.length : 0
+      );
+
       allProducts = allProducts.concat(data.products || []);
 
-      // 🔥 PAGINATION HANDLING
+      // 🔥 PAGINATION
       const linkHeader = response.headers.get("link");
 
       if (linkHeader && linkHeader.includes('rel="next"')) {
@@ -72,7 +79,7 @@ async function fetchProducts() {
       }
     }
 
-    console.log("✅ Total products fetched:", allProducts.length);
+    console.log("✅ TOTAL PRODUCTS FETCHED:", allProducts.length);
 
     return allProducts;
 
@@ -87,35 +94,35 @@ async function fetchProducts() {
 // ==============================
 async function searchProducts(query) {
   try {
-    const STORE_URL = process.env.STORE_URL || "https://ndestore.com";
+    console.log("🔍 SEARCH QUERY:", query);
 
-    if (!query || !query.part) return [];
+    if (!query || !query.part) {
+      console.log("❌ Invalid query");
+      return [];
+    }
 
     const products = await fetchProducts();
 
-    console.log("🔍 Searching for:", query);
+    console.log("📊 TOTAL PRODUCTS RECEIVED:", products.length);
 
-    // 🔥 SCORE PRODUCTS
     const scored = products.map(product => ({
       ...product,
       score: scoreProduct(product, query)
     }));
 
-    // 🔥 FILTER + SORT
     const matched = scored
-      .filter(p => p.score >= 60) // only part match required
+      .filter(p => p.score >= 60)
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
 
-    console.log("✅ Matched products:", matched.length);
+    console.log("✅ MATCHED PRODUCTS:", matched.length);
 
-    // 🔥 FORMAT RESPONSE
     return matched.map(product => ({
       id: product.id,
       title: product.title,
       price: product.variants?.[0]?.price || "N/A",
       image: product.image?.src || null,
-      url: `${STORE_URL}/products/${product.handle}`
+      url: `https://ndestore.com/products/${product.handle}`
     }));
 
   } catch (error) {
