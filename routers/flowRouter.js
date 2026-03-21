@@ -4,11 +4,11 @@ const autoPartsEntry = require("../flows/autoParts/entry");
 
 module.exports = {
 
-  route: async (parsed, user) => {
+  route: async ({ user, text }) => {
 
     let state = stateRepo.get(user);
 
-    // 🔹 FIRST TIME USER
+    // 🔹 FIRST TIME USER → SHOW MENU
     if (!state) {
       state = { flow: "main" };
       stateRepo.set(user, state);
@@ -27,16 +27,15 @@ Reply with number`
       };
     }
 
-    // 🔹 AUTO PARTS FLOW CONTINUATION
+    // 🔹 CONTINUE EXISTING FLOW
     if (state.flow === "autoParts") {
-      return autoPartsEntry(user, parsed.text || "", state);
+      return autoPartsEntry(user, text, state);
     }
 
-    // 🔹 TRIGGER AUTO PARTS VIA AI INTENT
-    if (parsed.intent === "autoParts") {
+    // 🔹 MANUAL MENU SELECTION
+    if (text === "1") {
       state.flow = "autoParts";
       state.step = "category";
-
       stateRepo.set(user, state);
 
       return autoPartsEntry(user, "", state);
