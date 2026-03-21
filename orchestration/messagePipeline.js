@@ -1,23 +1,20 @@
-const { parseUserInput } = require("../services/aiParser");
-const { runFlow } = require("./flowPipeline");
-const { sendTextMessage } = require("../services/whatsappService");
-
+const flowRouter = require("../routers/flowRouter");
 const normalize = require("../ai/queryNormalizer");
+
+const { sendTextMessage } = require("../services/whatsappService");
 
 async function runMessagePipeline({ from, text }) {
   try {
-    // 🔹 STEP 1: Normalize (spelling + synonym)
+    // 🔹 STEP 1: Normalize input (AI layer)
     text = normalize(text);
 
-    // 🔹 STEP 2: AI Parse (your existing system)
-    const parsed = await parseUserInput(text);
+    // 🔹 STEP 2: Route message (state-first system)
+    const result = await flowRouter.route({
+      user: from,
+      text
+    });
 
-    console.log("🧠 AI Parsed:", parsed);
-
-    // 🔹 STEP 3: Flow Execution
-    const result = await runFlow(parsed, from);
-
-    // 🔹 STEP 4: Send Response
+    // 🔹 STEP 3: Send response
     if (result?.reply) {
       await sendTextMessage(from, result.reply);
     }
