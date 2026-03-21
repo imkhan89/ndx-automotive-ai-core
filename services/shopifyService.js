@@ -1,25 +1,14 @@
-const axios = require("axios");
+exports.getProducts = async () => {
 
-const searchProducts = async (query) => {
-  try {
-    const url = `https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/products.json`;
-
-    const res = await axios.get(url, {
-      headers: {
-        "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN,
-      },
-    });
-
-    const products = res.data.products;
-
-    return products.filter(p =>
-      p.title.toLowerCase().includes(query.toLowerCase())
-    ).slice(0, 3);
-
-  } catch (err) {
-    console.error("Shopify error:", err.message);
-    return [];
-  }
+  return [
+    { title: "Air Filter VIC", price: "1800", usdPrice: "8" },
+    { title: "Air Filter OEM", price: "3200", usdPrice: "14" },
+    { title: "Air Filter Premium", price: "4500", usdPrice: "20" },
+    { title: "Extra Filter", price: "5000", usdPrice: "22" }
+  ];
 };
 
-module.exports = { searchProducts };
+exports.createOrder = async (state) => {
+  console.log("ORDER:", state);
+  return true;
+};
