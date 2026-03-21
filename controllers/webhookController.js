@@ -1,5 +1,5 @@
 const { sendTextMessage } = require("../services/whatsappService");
-// const { processUserMessage } = require("./aiController");
+const { processUserMessage } = require("./aiController"); // ✅ ENABLE AI
 
 async function handleWebhook(req, res) {
   try {
@@ -7,18 +7,18 @@ async function handleWebhook(req, res) {
     console.log("🔥 WEBHOOK EVENT RECEIVED");
     console.log("=================================");
 
-    // ✅ Respond immediately to Meta (CRITICAL)
+    // ✅ CRITICAL: Respond immediately to Meta
     res.sendStatus(200);
 
     const entry = req.body.entry?.[0];
     const changes = entry?.changes?.[0];
     const value = changes?.value;
 
-    // ✅ Debug full payload
+    // ✅ Full debug (keep this for now)
     console.log("📦 FULL PAYLOAD:");
     console.log(JSON.stringify(req.body, null, 2));
 
-    // ❌ No user message (delivery/read event)
+    // ❌ Ignore non-message events (delivery/read)
     if (!value?.messages) {
       console.log("ℹ️ No user message (status update event)");
       return;
@@ -35,7 +35,7 @@ async function handleWebhook(req, res) {
     let userText = "";
 
     // =====================================================
-    // ✅ HANDLE MESSAGE TYPES
+    // ✅ HANDLE ALL MESSAGE TYPES
     // =====================================================
 
     if (messageType === "text") {
@@ -54,26 +54,16 @@ async function handleWebhook(req, res) {
     console.log("💬 User Message:", userText);
 
     // =====================================================
-    // ✅ DEBUG SEND (UPDATED AS REQUESTED)
+    // 🚀 MAIN FLOW (AI + SHOPIFY)
     // =====================================================
 
-    console.log("🚀 BEFORE SEND");
-
-    const result = await sendTextMessage(
-      from,
-      `✅ TEST MESSAGE`
-    );
-
-    console.log("📤 SEND RESULT:", result);
-    console.log("✅ AFTER SEND");
-
-    // =====================================================
-    // 🚀 FUTURE AI FLOW
-    // =====================================================
-    // await processUserMessage(from, userText);
+    await processUserMessage(from, userText);
 
   } catch (error) {
-    console.error("❌ WEBHOOK ERROR:", error.response?.data || error.message || error);
+    console.error(
+      "❌ WEBHOOK ERROR:",
+      error.response?.data || error.message || error
+    );
   }
 }
 
