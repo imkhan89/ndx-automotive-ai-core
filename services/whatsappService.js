@@ -1,40 +1,42 @@
 const axios = require("axios");
 
-const TOKEN = process.env.WHATSAPP_TOKEN;
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-
-async function sendTextMessage(to, message) {
+// ===============================
+// 🔹 SEND TEXT MESSAGE FUNCTION
+// ===============================
+const sendTextMessage = async (to, message) => {
   try {
-    console.log("📡 Sending to WhatsApp:", to);
+    const url = `https://graph.facebook.com/v18.0/${process.env.PHONE_NUMBER_ID}/messages`;
 
     const response = await axios.post(
-      `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
+      url,
       {
         messaging_product: "whatsapp",
         to: to,
-        type: "text",
         text: {
           body: message,
         },
       },
       {
         headers: {
-          Authorization: `Bearer ${TOKEN}`,
+          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
           "Content-Type": "application/json",
         },
       }
     );
 
-    console.log("✅ WhatsApp Response:", response.data);
+    console.log("✅ WhatsApp API Response:", response.data);
 
     return response.data;
-
   } catch (error) {
-    console.error("❌ WhatsApp API ERROR:");
-    console.error(JSON.stringify(error.response?.data, null, 2));
+    console.error(
+      "❌ WhatsApp Send Error:",
+      error.response?.data || error.message
+    );
 
     return null;
   }
-}
+};
 
-module.exports = { sendTextMessage };
+module.exports = {
+  sendTextMessage,
+};
