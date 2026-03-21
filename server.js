@@ -1,69 +1,39 @@
 require("dotenv").config();
 
 const express = require("express");
-
 const app = express();
 
+// ===============================
+// 🔹 IMPORT ROUTES
+// ===============================
+const { handleWebhook, verifyWebhook } = require("./controllers/webhookController");
 
-// =====================================================
-// ✅ MIDDLEWARE
-// =====================================================
+// ===============================
+// 🔹 MIDDLEWARE
+// ===============================
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-
-// =====================================================
-// ✅ ROUTES
-// =====================================================
-
-// Import webhook route (MAKE SURE FILE EXISTS)
-const webhookRoutes = require("./routes/webhook");
-
-// Mount webhook route
-app.use("/webhook", webhookRoutes);
-
-
-// =====================================================
-// ✅ HEALTH CHECK (Railway Required)
-// =====================================================
+// ===============================
+// 🔹 HEALTH CHECK (CRITICAL - FIXES SIGTERM)
+// ===============================
 app.get("/", (req, res) => {
-  res.status(200).send("🚀 ndestore WhatsApp AI Server Running");
+  res.status(200).send("Server Alive ✅");
 });
 
+// ===============================
+// 🔹 WEBHOOK ROUTES
+// ===============================
+app.get("/webhook", verifyWebhook);   // Meta verification
+app.post("/webhook", handleWebhook);  // Incoming messages
 
-// =====================================================
-// ✅ ERROR HANDLER (IMPORTANT FOR DEBUGGING)
-// =====================================================
-app.use((err, req, res, next) => {
-  console.error("❌ Server Error:", err);
-  res.status(500).send("Internal Server Error");
-});
-
-
-// =====================================================
-// ✅ START SERVER
-// =====================================================
-const PORT = process.env.PORT || 3000;
+// ===============================
+// 🔹 START SERVER
+// ===============================
+const PORT = process.env.PORT || 8080;
 
 app.listen(PORT, () => {
   console.log("=================================");
   console.log(`✅ Server running on port ${PORT}`);
-  console.log(`🌐 Webhook URL: /webhook`);
+  console.log("🌐 Webhook URL: /webhook");
   console.log("=================================");
-});
-
-
-const { sendTextMessage } = require("./services/whatsappService");
-
-app.get("/test", async (req, res) => {
-  console.log("🔥 TEST ROUTE HIT");
-
-  const result = await sendTextMessage(
-    "923234954117", // YOUR NUMBER (NO +)
-    "🔥 Direct Test Message from Server"
-  );
-
-  console.log("📤 RESULT:", result);
-
-  res.send("Test executed");
 });
