@@ -29,7 +29,8 @@ Reply with number`
 
     // 🔹 CONTINUE EXISTING FLOW
     if (state.flow === "autoParts") {
-      return autoPartsEntry(user, text, state);
+      await autoPartsEntry(user, text, state);
+      return null; // flow already sent response
     }
 
     // 🔹 MANUAL MENU SELECTION
@@ -38,7 +39,8 @@ Reply with number`
       state.step = "category";
       stateRepo.set(user, state);
 
-      return autoPartsEntry(user, "", state);
+      await autoPartsEntry(user, "", state);
+      return null;
     }
 
     // 🔹 FALLBACK → MENU
