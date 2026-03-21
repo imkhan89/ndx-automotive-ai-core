@@ -3,43 +3,43 @@
 const fetch = require("node-fetch");
 
 // ==============================
-// 🔥 NORMALIZE TEXT
+// 🔥 NORMALIZE
 // ==============================
 function normalize(text) {
   return text.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 // ==============================
-// 🔥 SCORE PRODUCT (SMART MATCH)
+// 🔥 SCORE PRODUCT (FINAL LOGIC)
 // ==============================
 function scoreProduct(product, query) {
-  const title = product.title.toLowerCase();
+  const title = normalize(product.title);
 
   let score = 0;
 
-  // 🔧 PART MATCH (MOST IMPORTANT)
-  const partKeywords = query.part.toLowerCase().split(" ");
-  const partMatch = partKeywords.every(word => title.includes(word));
+  // 🔧 PART MATCH (PRIMARY - REQUIRED)
+  const partWords = query.part.toLowerCase().split(" ");
+  const partMatch = partWords.some(word => title.includes(word));
 
   if (partMatch) {
-    score += 50;
+    score += 60;
   }
 
-  // 🚗 MAKE MATCH
+  // 🚗 MAKE MATCH (OPTIONAL BOOST)
   if (title.includes(query.make.toLowerCase())) {
-    score += 25;
+    score += 20;
   }
 
-  // 🚘 MODEL MATCH
+  // 🚘 MODEL MATCH (OPTIONAL BOOST)
   if (title.includes(query.model.toLowerCase())) {
-    score += 25;
+    score += 20;
   }
 
   return score;
 }
 
 // ==============================
-// 🔥 FETCH PRODUCTS FROM SHOPIFY
+// 🔥 FETCH PRODUCTS
 // ==============================
 async function fetchProducts() {
   const SHOP = process.env.SHOPIFY_STORE_URL;
@@ -60,13 +60,13 @@ async function fetchProducts() {
 }
 
 // ==============================
-// 🔍 MAIN SEARCH FUNCTION
+// 🔍 SEARCH PRODUCTS
 // ==============================
 async function searchProducts(query) {
   try {
     const STORE_URL = process.env.STORE_URL || "https://ndestore.com";
 
-    if (!query || !query.part || !query.make || !query.model) {
+    if (!query || !query.part) {
       return [];
     }
 
@@ -78,12 +78,13 @@ async function searchProducts(query) {
       score: scoreProduct(product, query)
     }));
 
-    // 🔥 FILTER + SORT
+    // 🔥 FILTER (ONLY PART MATCH REQUIRED)
     const matched = scored
-      .filter(p => p.score >= 50) // 🔥 KEY FIX
-      .sort((a, b) => b.score - a.score);
+      .filter(p => p.score >= 60) // 🔥 KEY CHANGE
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
 
-    // 🔥 FORMAT RESPONSE
+    // 🔥 FORMAT OUTPUT
     return matched.map(product => ({
       id: product.id,
       title: product.title,
