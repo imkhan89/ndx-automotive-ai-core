@@ -1,22 +1,33 @@
-const autoPartsFlow = require("../flows/autoPartsFlow");
+const autoPartsEntry = require("../flows/autoParts/entry");
 const chatFlow = require("../flows/chatFlow");
 
 const routeMessage = async (userId, message) => {
   try {
     const text = message.toLowerCase();
 
-    // 🔥 AUTO PARTS DETECTION
+    console.log("🧠 Routing message:", text);
+
+    // ===============================
+    // 🔹 AUTO PARTS INTENT
+    // ===============================
     if (
       text.includes("filter") ||
       text.includes("brake") ||
       text.includes("spark") ||
       text.includes("plug") ||
-      text.includes("oil")
+      text.includes("oil") ||
+      text.includes("part")
     ) {
-      return await autoPartsFlow(userId, message);
+      console.log("🚗 Auto Parts Flow Triggered");
+
+      return await autoPartsEntry(userId, message);
     }
 
-    // 🔥 DEFAULT CHAT
+    // ===============================
+    // 🔹 DEFAULT CHAT
+    // ===============================
+    console.log("🤖 Chat Flow Triggered");
+
     return await chatFlow(userId, message);
 
   } catch (err) {
