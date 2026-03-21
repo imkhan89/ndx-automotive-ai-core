@@ -1,39 +1,20 @@
-require("dotenv").config();
-
 const express = require("express");
 const app = express();
 
-// ===============================
-// 🔹 IMPORT ROUTES
-// ===============================
-const { handleWebhook, verifyWebhook } = require("./controllers/webhookController");
+const webhookRoutes = require("./routes/webhook");
 
-// ===============================
-// 🔹 MIDDLEWARE
-// ===============================
 app.use(express.json());
 
-// ===============================
-// 🔹 HEALTH CHECK (CRITICAL - FIXES SIGTERM)
-// ===============================
+// ✅ Use router (CORRECT WAY)
+app.use("/webhook", webhookRoutes);
+
+// ✅ Basic health check (optional but safe)
 app.get("/", (req, res) => {
-  res.status(200).send("Server Alive ✅");
+  res.send("Server is running");
 });
 
-// ===============================
-// 🔹 WEBHOOK ROUTES
-// ===============================
-app.get("/webhook", verifyWebhook);   // Meta verification
-app.post("/webhook", handleWebhook);  // Incoming messages
-
-// ===============================
-// 🔹 START SERVER
-// ===============================
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("=================================");
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log("🌐 Webhook URL: /webhook");
-  console.log("=================================");
+  console.log(`🚀 Server running on port ${PORT}`);
 });
