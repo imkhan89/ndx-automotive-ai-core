@@ -1,27 +1,60 @@
 const stateRepo = require("../state/stateRepository");
+
 const autoPartsEntry = require("../flows/autoParts/entry");
-const send = require("../services/whatsappService").send;
-const mainMenu = require("../interface/templates/mainMenuTemplate");
 
-exports.route = async (user, text) => {
-  let state = stateRepo.get(user);
+module.exports = {
 
-  if (!state) {
-    stateRepo.set(user, { flow: "main" });
-    return send(user, mainMenu());
+  route: async (parsed, user) => {
+
+    let state = stateRepo.get(user);
+
+    // 🔹 FIRST TIME USER
+    if (!state) {
+      state = { flow: "main" };
+      stateRepo.set(user, state);
+
+      return {
+        reply: `Main Menu:
+
+1. Auto Parts
+2. Accessories
+3. Decal Stickers
+4. Order Status
+5. Complaint
+6. Chat Support
+
+Reply with number`
+      };
+    }
+
+    // 🔹 AUTO PARTS FLOW CONTINUATION
+    if (state.flow === "autoParts") {
+      return autoPartsEntry(user, parsed.text || "", state);
+    }
+
+    // 🔹 TRIGGER AUTO PARTS VIA AI INTENT
+    if (parsed.intent === "autoParts") {
+      state.flow = "autoParts";
+      state.step = "category";
+
+      stateRepo.set(user, state);
+
+      return autoPartsEntry(user, "", state);
+    }
+
+    // 🔹 FALLBACK → MENU
+    return {
+      reply: `Main Menu:
+
+1. Auto Parts
+2. Accessories
+3. Decal Stickers
+4. Order Status
+5. Complaint
+6. Chat Support
+
+Reply with number`
+    };
   }
 
-  if (state.flow === "autoParts") {
-    return autoPartsEntry(user, text, state);
-  }
-
-  if (text === "1") {
-    state.flow = "autoParts";
-    state.step = "category";
-    stateRepo.set(user, state);
-
-    return autoPartsEntry(user, "", state);
-  }
-
-  return send(user, mainMenu());
 };
