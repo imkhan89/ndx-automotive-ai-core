@@ -8,7 +8,7 @@ const { handleAutoPartsFlow } = require("../flows/autoParts/entry");
 const aiParser = require("../services/aiParser");
 
 // ==============================
-// 🔐 VERIFY WEBHOOK (META)
+// 🔐 VERIFY WEBHOOK
 // ==============================
 router.get("/", (req, res) => {
   const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
@@ -22,7 +22,6 @@ router.get("/", (req, res) => {
     return res.status(200).send(challenge);
   }
 
-  console.log("❌ Webhook verification failed");
   return res.sendStatus(403);
 });
 
@@ -45,44 +44,50 @@ router.post("/", async (req, res) => {
       if (message) {
         const from = message.from;
 
-        // 🔥 SAFE TEXT EXTRACTION
-        const text = message.text?.body || "";
+        // 🔥 HANDLE TEXT + BUTTON INPUT
+        const text =
+          message.text?.body ||
+          message.button?.text ||
+          message.interactive?.button_reply?.id ||
+          "";
 
         if (!text) {
-          console.log("⚠️ No text message received");
+          console.log("⚠️ No valid message");
           return res.sendStatus(200);
         }
 
         console.log("📩 Incoming:", text);
 
         let reply;
-
         const lowerText = text.toLowerCase();
 
         // ==============================
         // ⚡ SMART ROUTING
         // ==============================
 
-        // 🔢 NUMBER → SELECTION
+        // 🔢 NUMBER (selection)
         if (/^\d+$/.test(text)) {
           reply = await handleAutoPartsFlow(from, text, null);
         }
 
-        // ✅ YES / NO → CONFIRMATION
+        // ✅ YES / NO (confirmation)
         else if (["yes", "no"].includes(lowerText)) {
           reply = await handleAutoPartsFlow(from, text, null);
         }
 
-        // 👋 GREETING HANDLER
+        // 👋 GREETING
         else if (
           ["hi", "hello", "assalamualaikum", "salam"].includes(lowerText)
         ) {
-          reply =
-            "👋 Welcome to NDX Automotive!\n\n" +
-            "Please tell me:\n" +
-            "🚗 Car Make + Model\n" +
-            "🔧 Part you need\n\n" +
-            "Example:\nToyota Corolla air filter";
+          reply = {
+            message:
+              "👋 Welcome to NDX Automotive!\n\n" +
+              "Please tell me:\n" +
+              "🚗 Car Make + Model\n" +
+              "🔧 Part you need\n\n" +
+              "Example:\nToyota Corolla air filter",
+            buttons: []
+          };
         }
 
         // 🧠 AI PARSE
@@ -90,9 +95,12 @@ router.post("/", async (req, res) => {
           const aiData = await aiParser(text);
 
           if (!aiData || !aiData.part) {
-            reply =
-              "❌ Could not understand your request.\n\n" +
-              "Please try like:\nToyota Corolla air filter";
+            reply = {
+              message:
+                "❌ Could not understand your request.\n\n" +
+                "Please try like:\nToyota Corolla air filter",
+              buttons: []
+            };
           } else {
             reply = await handleAutoPartsFlow(from, text, aiData);
           }
@@ -101,9 +109,13 @@ router.post("/", async (req, res) => {
         console.log("📤 Reply:", reply);
 
         // ==============================
-        // 📤 SEND WHATSAPP MESSAGE
+        // 📤 SEND MESSAGE
         // ==============================
-        await sendWhatsAppMessage(from, reply);
+        if (typeof reply === "object") {
+          await sendWhatsAppMessage(from, reply.message, reply.buttons);
+        } else {
+          await sendWhatsAppMessage(from, reply);
+        }
       }
 
       return res.sendStatus(200);
@@ -118,19 +130,49 @@ router.post("/", async (req, res) => {
 });
 
 // ==============================
-// 📤 SEND MESSAGE FUNCTION
+// 📤 SEND WHATSAPP MESSAGE
 // ==============================
-async function sendWhatsAppMessage(to, message) {
+async function sendWhatsAppMessage(to, message, buttons = []) {
   try {
     const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
     const TOKEN = process.env.WHATSAPP_TOKEN;
 
-    if (!PHONE_NUMBER_ID || !TOKEN) {
-      console.error("❌ Missing WhatsApp credentials");
-      return;
+    const url = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
+
+    let payload;
+
+    // 🔥 INTERACTIVE BUTTON MESSAGE
+    if (buttons && buttons.length > 0) {
+      payload = {
+        messaging_product: "whatsapp",
+        to: to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: {
+            text: message
+          },
+          action: {
+            buttons: buttons.map(btn => ({
+              type: "reply",
+              reply: {
+                id: btn.id,
+                title: btn.title
+              }
+            }))
+          }
+        }
+      };
     }
 
-    const url = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
+    // 🔹 NORMAL TEXT MESSAGE
+    else {
+      payload = {
+        messaging_product: "whatsapp",
+        to: to,
+        text: { body: message }
+      };
+    }
 
     await fetch(url, {
       method: "POST",
@@ -138,11 +180,7 @@ async function sendWhatsAppMessage(to, message) {
         Authorization: `Bearer ${TOKEN}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: to,
-        text: { body: message }
-      })
+      body: JSON.stringify(payload)
     });
 
   } catch (error) {
