@@ -1,72 +1,36 @@
-const { sendTextMessage } = require("../services/whatsappService");
-const { processUserMessage } = require("./aiController"); // ✅ ENABLE AI
+const { processUserMessage } = require("./aiController");
 
-async function handleWebhook(req, res) {
+exports.handleWebhook = async (req, res) => {
+  console.log("🔥 WEBHOOK EVENT RECEIVED");
+
   try {
-    console.log("=================================");
-    console.log("🔥 WEBHOOK EVENT RECEIVED");
-    console.log("=================================");
+    const body = req.body;
 
-    // ✅ CRITICAL: Respond immediately to Meta
-    res.sendStatus(200);
+    if (body.object) {
+      const entry = body.entry?.[0];
+      const changes = entry?.changes?.[0];
+      const value = changes?.value;
 
-    const entry = req.body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
+      const message = value?.messages?.[0];
 
-    // ✅ Full debug (keep this for now)
-    console.log("📦 FULL PAYLOAD:");
-    console.log(JSON.stringify(req.body, null, 2));
+      if (message && message.type === "text") {
+        const from = message.from;
+        const userText = message.text.body;
 
-    // ❌ Ignore non-message events (delivery/read)
-    if (!value?.messages) {
-      console.log("ℹ️ No user message (status update event)");
-      return;
+        console.log("📩 From:", from);
+        console.log("💬 Message:", userText);
+
+        // ✅ ONLY ONE FLOW (NO DUPLICATION)
+        await processUserMessage(from, userText);
+      }
+
+      return res.sendStatus(200);
     }
 
-    const message = value.messages[0];
-
-    const from = message.from;
-    const messageType = message.type;
-
-    console.log("📩 From:", from);
-    console.log("📌 Type:", messageType);
-
-    let userText = "";
-
-    // =====================================================
-    // ✅ HANDLE ALL MESSAGE TYPES
-    // =====================================================
-
-    if (messageType === "text") {
-      userText = message.text?.body || "";
-    } else if (messageType === "button") {
-      userText = message.button?.text || "";
-    } else if (messageType === "interactive") {
-      userText =
-        message.interactive?.button_reply?.title ||
-        message.interactive?.list_reply?.title ||
-        "interactive message";
-    } else {
-      userText = "Unsupported message type";
-    }
-
-    console.log("💬 User Message:", userText);
-
-    // =====================================================
-    // 🚀 MAIN FLOW (AI + SHOPIFY)
-    // =====================================================
-
-    await processUserMessage(from, userText);
+    return res.sendStatus(404);
 
   } catch (error) {
-    console.error(
-      "❌ WEBHOOK ERROR:",
-      error.response?.data || error.message || error
-    );
+    console.error("❌ Webhook Error:", error.message);
+    return res.sendStatus(500);
   }
-}
-
-module.exports = {
-  handleWebhook,
 };
