@@ -19,10 +19,12 @@ const sendTextMessage = async (to, message) => {
       }
     );
 
+    console.log("📤 WhatsApp Response:", res.data);
     return res.data;
 
   } catch (error) {
-    console.error("WhatsApp error:", error.response?.data || error.message);
+    console.error("❌ WhatsApp ERROR FULL:");
+    console.error(error.response?.data || error.message);
   }
 };
 
