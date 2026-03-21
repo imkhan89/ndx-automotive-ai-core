@@ -1,4 +1,5 @@
 const { routeMessage } = require("../logic/router");
+const { sendTextMessage } = require("../services/whatsappService");
 
 // ===============================
 // VERIFY WEBHOOK
@@ -16,10 +17,11 @@ const verifyWebhook = (req, res) => {
 };
 
 // ===============================
-// HANDLE WEBHOOK (CLEAN)
+// HANDLE WEBHOOK (FIXED)
 // ===============================
 const handleWebhook = async (req, res) => {
   try {
+    // ✅ respond immediately to Meta
     res.sendStatus(200);
 
     const value = req.body.entry?.[0]?.changes?.[0]?.value;
@@ -38,8 +40,24 @@ const handleWebhook = async (req, res) => {
 
     console.log("💬 USER:", text);
 
-    // 🔥 ROUTE TO SYSTEM (IMPORTANT)
-    await routeMessage(from, text);
+    // ===============================
+    // 🔥 GET REPLY FROM ROUTER
+    // ===============================
+    const reply = await routeMessage(from, text);
+
+    console.log("🤖 BOT:", reply);
+
+    if (!reply) {
+      console.log("⚠️ No reply generated");
+      return;
+    }
+
+    // ===============================
+    // 🔥 SEND MESSAGE TO WHATSAPP
+    // ===============================
+    const result = await sendTextMessage(from, reply);
+
+    console.log("📤 SEND RESULT:", result);
 
   } catch (err) {
     console.error("❌ Webhook error:", err.message);
