@@ -1,28 +1,24 @@
-const flowRouter = require("../routers/flowRouter");
-const normalize = require("../ai/queryNormalizer");
-
+const { runFlow } = require("./flowPipeline");
 const { sendTextMessage } = require("../services/whatsappService");
 
 async function runMessagePipeline({ from, text }) {
   try {
-    // 🔹 STEP 1: Normalize input
-    text = normalize(text || "");
+    console.log("🧠 Incoming:", text);
 
-    console.log("🧠 Routing message:", text);
+    // STEP 1: DIRECT FLOW (NO AI PARSER)
+    const result = await runFlow({ text, from });
 
-    // 🔹 STEP 2: Route via flow system
-    const result = await flowRouter.route({
-      user: from,
-      text
-    });
+    console.log("📦 Flow Result:", result);
 
-    // 🔹 STEP 3: Send ONLY if router returns reply
-    if (result && result.reply) {
+    // STEP 2: SEND RESPONSE
+    if (result?.reply) {
       await sendTextMessage(from, result.reply);
+    } else {
+      await sendTextMessage(from, "⚠️ No response generated.");
     }
 
   } catch (error) {
-    console.error("Pipeline Error:", error);
+    console.error("❌ Pipeline Error:", error);
 
     await sendTextMessage(
       from,
