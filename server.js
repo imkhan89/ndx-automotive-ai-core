@@ -1,28 +1,53 @@
 require("dotenv").config();
 
 const express = require("express");
-const bodyParser = require("body-parser");
 
 const app = express();
 
-// ✅ Middleware
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
 
-// ✅ Routes
+// =====================================================
+// ✅ MIDDLEWARE
+// =====================================================
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+
+// =====================================================
+// ✅ ROUTES
+// =====================================================
+
+// Import webhook route (MAKE SURE FILE EXISTS)
 const webhookRoutes = require("./routes/webhook");
 
-// IMPORTANT: This maps /webhook correctly
+// Mount webhook route
 app.use("/webhook", webhookRoutes);
 
-// ✅ Health check (Railway)
+
+// =====================================================
+// ✅ HEALTH CHECK (Railway Required)
+// =====================================================
 app.get("/", (req, res) => {
-  res.status(200).send("🚀 ndestore WhatsApp AI is running");
+  res.status(200).send("🚀 ndestore WhatsApp AI Server Running");
 });
 
-// ✅ Start server
+
+// =====================================================
+// ✅ ERROR HANDLER (IMPORTANT FOR DEBUGGING)
+// =====================================================
+app.use((err, req, res, next) => {
+  console.error("❌ Server Error:", err);
+  res.status(500).send("Internal Server Error");
+});
+
+
+// =====================================================
+// ✅ START SERVER
+// =====================================================
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
+  console.log("=================================");
   console.log(`✅ Server running on port ${PORT}`);
+  console.log(`🌐 Webhook URL: /webhook`);
+  console.log("=================================");
 });
