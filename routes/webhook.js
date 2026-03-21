@@ -5,7 +5,7 @@ const { handleWebhook } = require("../controllers/webhookController");
 
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "ndestore_verify_token";
 
-// ✅ VERIFY WEBHOOK
+// ✅ Webhook Verification (Meta)
 router.get("/", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -18,7 +18,7 @@ router.get("/", (req, res) => {
   return res.sendStatus(403);
 });
 
-// ✅ RECEIVE MESSAGE
+// ✅ Receive Messages
 router.post("/", handleWebhook);
 
 module.exports = router;
