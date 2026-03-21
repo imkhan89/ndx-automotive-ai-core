@@ -1,3 +1,4 @@
+const axios = require("axios");
 const { sendTextMessage } = require("../services/whatsappService");
 
 // ===============================
@@ -23,7 +24,7 @@ const verifyWebhook = (req, res) => {
 };
 
 // ===============================
-// 🔹 HANDLE INCOMING MESSAGES (POST)
+// 🔹 HANDLE INCOMING MESSAGES
 // ===============================
 const handleWebhook = async (req, res) => {
   try {
@@ -41,7 +42,7 @@ const handleWebhook = async (req, res) => {
     console.log("📦 FULL PAYLOAD:");
     console.log(JSON.stringify(req.body, null, 2));
 
-    // ❌ No message
+    // ❌ Ignore non-message events
     if (!value?.messages) {
       console.log("ℹ️ No user message");
       return;
@@ -57,7 +58,7 @@ const handleWebhook = async (req, res) => {
     let userText = "";
 
     // ===============================
-    // 🔹 MESSAGE TYPES
+    // 🔹 HANDLE MESSAGE TYPES
     // ===============================
     if (type === "text") {
       userText = message.text?.body || "";
@@ -75,14 +76,18 @@ const handleWebhook = async (req, res) => {
     console.log("💬 User Message:", userText);
 
     // ===============================
-    // 🔹 SEND REPLY (DEBUG SAFE)
+    // 🔹 GENERATE AI RESPONSE
+    // ===============================
+    const aiReply = await generateAIResponse(userText);
+
+    console.log("🤖 AI Reply:", aiReply);
+
+    // ===============================
+    // 🔹 SEND WHATSAPP MESSAGE
     // ===============================
     console.log("🚀 BEFORE SEND");
 
-    const result = await sendTextMessage(
-      from,
-      `✅ TEST MESSAGE RECEIVED: ${userText}`
-    );
+    const result = await sendTextMessage(from, aiReply);
 
     console.log("📤 SEND RESULT:", result);
     console.log("✅ AFTER SEND");
@@ -96,7 +101,57 @@ const handleWebhook = async (req, res) => {
 };
 
 // ===============================
-// 🔹 EXPORTS (CRITICAL FIX)
+// 🔹 OPENAI RESPONSE FUNCTION
+// ===============================
+const generateAIResponse = async (userMessage) => {
+  try {
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `
+You are a professional automotive assistant for ndestore.com (Pakistan).
+
+Your job:
+- Help users find correct car parts
+- Ask relevant questions (car make, model, year, engine)
+- Recommend products (air filters, oil filters, brake pads, etc.)
+- Keep replies short, clear, and sales-focused
+- Suggest ordering from ndestore.com when relevant
+            `,
+          },
+          {
+            role: "user",
+            content: userMessage,
+          },
+        ],
+        temperature: 0.7,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return response.data.choices[0].message.content;
+
+  } catch (error) {
+    console.error(
+      "❌ OpenAI Error:",
+      error.response?.data || error.message
+    );
+
+    return "Sorry, I'm facing a temporary issue. Please try again shortly.";
+  }
+};
+
+// ===============================
+// 🔹 EXPORTS (CRITICAL)
 // ===============================
 module.exports = {
   handleWebhook,
