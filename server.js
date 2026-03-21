@@ -51,3 +51,19 @@ app.listen(PORT, () => {
   console.log(`🌐 Webhook URL: /webhook`);
   console.log("=================================");
 });
+
+
+const { sendTextMessage } = require("./services/whatsappService");
+
+app.get("/test", async (req, res) => {
+  console.log("🔥 TEST ROUTE HIT");
+
+  const result = await sendTextMessage(
+    "923234954117", // YOUR NUMBER (NO +)
+    "🔥 Direct Test Message from Server"
+  );
+
+  console.log("📤 RESULT:", result);
+
+  res.send("Test executed");
+});
