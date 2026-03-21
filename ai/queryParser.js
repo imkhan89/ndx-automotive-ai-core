@@ -7,27 +7,44 @@ const client = new OpenAI({
 const parseQueryAI = async (message) => {
   try {
     const response = await client.chat.completions.create({
-      model: "gpt-5.3",
+      model: "gpt-4o-mini",
       messages: [
         {
-          role: "user",
+          role: "system",
           content: `
-Extract vehicle details from this:
+You are an automotive query parser.
 
-"${message}"
+Extract:
+- make
+- model
+- year
 
-Return JSON:
+Return ONLY valid JSON.
+
+Example:
 {
-  "make": "",
-  "model": "",
-  "year": ""
+  "make": "Toyota",
+  "model": "Corolla",
+  "year": "2017"
 }
 `
+        },
+        {
+          role: "user",
+          content: message
         }
-      ]
+      ],
+      temperature: 0
     });
 
-    return JSON.parse(response.choices[0].message.content);
+    const raw = response.choices[0].message.content;
+
+    try {
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error("JSON Parse Error:", raw);
+      return { raw: message };
+    }
 
   } catch (err) {
     console.error("AI Parse Error:", err.message);
