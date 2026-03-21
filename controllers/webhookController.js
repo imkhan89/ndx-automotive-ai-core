@@ -1,9 +1,9 @@
 const axios = require("axios");
 const { sendTextMessage } = require("../services/whatsappService");
-const { findProductMatch } = require("../utils/productMatcher");
+const { findProductMatch } = require("../utils/productMap");
 
 // ===============================
-// 🔹 VERIFY WEBHOOK (GET)
+// 🔹 VERIFY WEBHOOK
 // ===============================
 const verifyWebhook = (req, res) => {
   try {
@@ -15,112 +15,96 @@ const verifyWebhook = (req, res) => {
       console.log("✅ Webhook verified");
       return res.status(200).send(challenge);
     } else {
-      console.log("❌ Webhook verification failed");
       return res.sendStatus(403);
     }
-  } catch (error) {
-    console.error("❌ VERIFY ERROR:", error);
+  } catch (err) {
+    console.error("❌ VERIFY ERROR:", err);
     return res.sendStatus(500);
   }
 };
 
 // ===============================
-// 🔹 HANDLE INCOMING MESSAGES
+// 🔹 HANDLE WEBHOOK
 // ===============================
 const handleWebhook = async (req, res) => {
   try {
-    console.log("=================================");
-    console.log("🔥 WEBHOOK EVENT RECEIVED");
-    console.log("=================================");
+    console.log("🔥 WEBHOOK EVENT");
 
-    // ✅ Respond immediately (CRITICAL)
     res.sendStatus(200);
 
-    const entry = req.body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
+    const value = req.body.entry?.[0]?.changes?.[0]?.value;
 
-    console.log("📦 FULL PAYLOAD:");
-    console.log(JSON.stringify(req.body, null, 2));
-
-    // ❌ Ignore non-message events
-    if (!value?.messages) {
-      console.log("ℹ️ No user message");
-      return;
-    }
+    if (!value?.messages) return;
 
     const message = value.messages[0];
     const from = message.from;
-    const type = message.type;
 
-    console.log("📩 From:", from);
-    console.log("📌 Type:", type);
+    let userText =
+      message.text?.body ||
+      message.button?.text ||
+      message.interactive?.button_reply?.title ||
+      message.interactive?.list_reply?.title ||
+      "";
 
-    let userText = "";
-
-    // ===============================
-    // 🔹 HANDLE MESSAGE TYPES
-    // ===============================
-    if (type === "text") {
-      userText = message.text?.body || "";
-    } else if (type === "button") {
-      userText = message.button?.text || "";
-    } else if (type === "interactive") {
-      userText =
-        message.interactive?.button_reply?.title ||
-        message.interactive?.list_reply?.title ||
-        "interactive message";
-    } else {
-      userText = "Unsupported message";
-    }
-
-    console.log("💬 User Message:", userText);
+    console.log("💬 USER:", userText);
 
     // ===============================
-    // 🔹 PRODUCT MATCHING ENGINE
+    // 🔹 PRODUCT MATCHING (AI + RULES)
     // ===============================
     const matchedProduct = findProductMatch(userText);
 
     let finalReply = "";
 
     if (matchedProduct) {
-      console.log("🛒 Product Match Found:", matchedProduct.name);
-
-      finalReply = `✅ *${matchedProduct.name}*
-
-💰 Price: ${matchedProduct.price}
-
-🔗 Order Now:
-${matchedProduct.link}
-
-Need help with installation or compatibility? Let me know 👍`;
+      finalReply = buildSalesReply(matchedProduct);
     } else {
-      console.log("🤖 No product match → using AI");
-
-      const aiReply = await generateAIResponse(userText);
-      finalReply = aiReply;
+      finalReply = await generateAIResponse(userText);
     }
 
     // ===============================
-    // 🔹 SEND WHATSAPP MESSAGE
+    // 🔹 SEND
     // ===============================
-    console.log("🚀 BEFORE SEND");
-
-    const result = await sendTextMessage(from, finalReply);
-
-    console.log("📤 SEND RESULT:", result);
-    console.log("✅ AFTER SEND");
+    await sendTextMessage(from, finalReply);
 
   } catch (error) {
-    console.error(
-      "❌ WEBHOOK ERROR:",
-      error.response?.data || error.message || error
-    );
+    console.error("❌ WEBHOOK ERROR:", error.message);
   }
 };
 
 // ===============================
-// 🔹 OPENAI RESPONSE FUNCTION
+// 🔹 SALES REPLY BUILDER
+// ===============================
+const buildSalesReply = (product) => {
+  let reply = `✅ *${product.name}*
+
+💰 Price: ${product.price}
+
+🔗 Order Now:
+${product.link}`;
+
+  // Upsell
+  if (product.upsell) {
+    reply += `
+
+🔥 *Recommended Add-on:*
+${product.upsell.name}
+
+💰 Price: ${product.upsell.price}
+
+👉 ${product.upsell.link}
+
+💡 Order both & save delivery cost!`;
+  }
+
+  reply += `
+
+🚗 Need confirmation for your exact model? Tell me your variant 👍`;
+
+  return reply;
+};
+
+// ===============================
+// 🔹 AI RESPONSE (UNLIMITED LEARNING CORE)
 // ===============================
 const generateAIResponse = async (userMessage) => {
   try {
@@ -132,14 +116,15 @@ const generateAIResponse = async (userMessage) => {
           {
             role: "system",
             content: `
-You are a professional automotive assistant for ndestore.com (Pakistan).
+You are an expert automotive AI sales assistant for ndestore.com.
 
-Your goals:
-- Help users find correct car parts
-- Ask for missing info (car model, year, engine)
-- Recommend relevant products
-- Keep replies short, clear, and sales-focused
-- Encourage ordering from ndestore.com
+Rules:
+- Understand ANY car, ANY part (no limitation)
+- Ask missing info (Make, Model, Year, Engine)
+- Recommend parts intelligently
+- Be concise, professional, sales-focused
+- Encourage buying from ndestore.com
+- If unclear → ask questions instead of guessing
             `,
           },
           {
@@ -160,17 +145,11 @@ Your goals:
     return response.data.choices[0].message.content;
 
   } catch (error) {
-    console.error(
-      "❌ OpenAI Error:",
-      error.response?.data || error.message
-    );
-
-    return "Sorry, I'm facing a temporary issue. Please try again shortly.";
+    console.error("❌ OpenAI Error:", error.message);
+    return "Please share your car model & part required 👍";
   }
 };
 
-// ===============================
-// 🔹 EXPORTS
 // ===============================
 module.exports = {
   handleWebhook,
