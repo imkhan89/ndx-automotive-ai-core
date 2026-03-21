@@ -1,15 +1,33 @@
-module.exports = (text = "") => {
+const synonymMap = {
+  "control arm": ["wishbone", "lower arm", "suspension arm"],
+  "brake pad": ["brake pads", "pads", "brake lining"],
+  "air filter": ["filter", "air cleaner", "engine filter"],
+  "oil filter": ["oil filter", "engine oil filter"],
+  "fuel filter": ["fuel filter", "petrol filter"],
+  "headlight": ["lamp", "front light"],
+  "tail light": ["back light", "rear light"],
+};
 
-  const map = {
-    "filter": "air filter",
-    "air cleaner": "air filter",
-    "oil": "oil filter",
-    "engine oil filter": "oil filter",
-    "brake pad": "brake parts",
-    "brake shoes": "brake parts"
-  };
+const normalizePart = (text = "") => {
+  const t = text.toLowerCase();
 
-  const lower = text.toLowerCase().trim();
+  // 1. Direct match
+  for (const mainPart in synonymMap) {
+    if (t.includes(mainPart)) return mainPart;
 
-  return map[lower] || text;
+    for (const synonym of synonymMap[mainPart]) {
+      if (t.includes(synonym)) return mainPart;
+    }
+  }
+
+  // 2. AI-style fallback (pattern-based)
+  if (t.includes("arm")) return "control arm";
+  if (t.includes("brake")) return "brake pad";
+  if (t.includes("filter")) return "air filter";
+
+  return null;
+};
+
+module.exports = {
+  normalizePart
 };
