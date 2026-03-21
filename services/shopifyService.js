@@ -1,33 +1,46 @@
 const axios = require("axios");
 
-const STORE = process.env.SHOPIFY_STORE_URL;
-const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
+// ===============================
+// 🔹 CONFIG
+// ===============================
+const SHOPIFY_STORE = process.env.SHOPIFY_STORE; 
+const SHOPIFY_TOKEN = process.env.SHOPIFY_TOKEN;
 
-async function searchProducts(query) {
+// Example:
+// SHOPIFY_STORE=ndestore.myshopify.com
+// SHOPIFY_TOKEN=shpat_xxxxx
+
+// ===============================
+// 🔹 SEARCH PRODUCTS (LIVE)
+// ===============================
+const searchProducts = async (query) => {
   try {
-    const url = `https://${STORE}/admin/api/2023-10/products.json?limit=250`;
+    const url = `https://${SHOPIFY_STORE}/admin/api/2023-10/products.json`;
 
-    const res = await axios.get(url, {
+    const response = await axios.get(url, {
       headers: {
-        "X-Shopify-Access-Token": TOKEN,
+        "X-Shopify-Access-Token": SHOPIFY_TOKEN,
+      },
+      params: {
+        limit: 50,
       },
     });
 
-    const products = res.data.products;
+    const products = response.data.products;
 
-    return products
-      .filter(p =>
-        p.title.toLowerCase().includes(query.toLowerCase())
-      )
-      .map(p => ({
-        title: p.title,
-        price: p.variants[0].price,
-      }));
+    // 🔍 Basic filtering (can be improved with AI later)
+    const matched = products.filter((product) =>
+      product.title.toLowerCase().includes(query.toLowerCase())
+    );
+
+    return matched.slice(0, 3); // return top 3
 
   } catch (error) {
-    console.error("Shopify Error:", error.message);
+    console.error("❌ Shopify Error:", error.response?.data || error.message);
     return [];
   }
-}
+};
 
-module.exports = { searchProducts };
+module.exports = {
+  searchProducts,
+};
