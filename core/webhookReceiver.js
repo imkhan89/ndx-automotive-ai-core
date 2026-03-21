@@ -1,23 +1,22 @@
-const express = require("express");
-const router = express.Router();
+const { runMessagePipeline } = require("../orchestration/messagePipeline");
 
-const messagePipeline = require("../orchestration/messagePipeline");
+async function processIncomingMessage(body) {
+  const entry = body.entry?.[0];
+  const changes = entry?.changes?.[0];
+  const value = changes?.value;
+  const message = value?.messages?.[0];
 
-router.post("/", async (req, res) => {
-  try {
-    const msg = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-    if (!msg) return res.sendStatus(200);
+  if (!message) return;
 
-    const user = msg.from;
-    const text = msg.text?.body || "";
+  const from = message.from;
+  const text = message.text?.body;
 
-    await messagePipeline.execute(user, text);
+  console.log("📩 Incoming:", from, text);
 
-    res.sendStatus(200);
-  } catch (err) {
-    console.error("Webhook Error:", err);
-    res.sendStatus(500);
-  }
-});
+  await runMessagePipeline({
+    from,
+    text,
+  });
+}
 
-module.exports = router;
+module.exports = { processIncomingMessage };
