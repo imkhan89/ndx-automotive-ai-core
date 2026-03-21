@@ -1,6 +1,6 @@
 const { parseSynonyms } = require("../../utils/synonymMap");
 
-// ✅ MAIN FUNCTION
+// ✅ MAIN INTENT DETECTOR
 const detectIntent = (text = "") => {
   const parsed = parseSynonyms(text);
 
@@ -13,6 +13,7 @@ const detectIntent = (text = "") => {
   };
 };
 
+// ✅ EXPORT (VERY IMPORTANT)
 module.exports = {
   detectIntent
 };
