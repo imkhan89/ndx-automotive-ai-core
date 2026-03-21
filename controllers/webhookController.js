@@ -1,45 +1,51 @@
 const { processQuery } = require("../core/queryEngine");
-const { sendWhatsAppMessage } = require("../services/whatsappService");
+const sendWhatsAppMessage = require("../services/whatsappService");
 
-module.exports = {
+exports.handleWebhook = async (req, res) => {
+  try {
+    const entry = req.body.entry?.[0];
+    const changes = entry?.changes?.[0];
+    const message = changes?.value?.messages?.[0];
 
-  handleWebhook: async (req, res) => {
-    try {
-      const entry = req.body.entry?.[0];
-      const changes = entry?.changes?.[0];
-      const value = changes?.value;
+    if (!message) return res.sendStatus(200);
 
-      const message = value?.messages?.[0];
+    const from = message.from;
+    const text = message.text?.body || "";
 
-      // Ignore non-message events
-      if (!message) {
-        return res.sendStatus(200);
-      }
+    console.log("💬 Incoming:", text);
 
-      const from = message.from;
-      const text = message.text?.body || "";
+    // ✅ Use query engine
+    const result = await processQuery(text);
 
-      console.log("💬 Incoming:", text);
+    let reply = "";
 
-      // 🔥 Core Processing
-      const result = await processQuery(text);
-
-      // ✅ Fail-safe response
-      if (!result || !result.reply) {
-        await sendWhatsAppMessage(
-          from,
-          "⚠️ Unable to process your request. Please try again."
-        );
-      } else {
-        await sendWhatsAppMessage(from, result.reply);
-      }
-
-      return res.sendStatus(200);
-
-    } catch (error) {
-      console.error("❌ Webhook Error:", error.message);
-      return res.sendStatus(500);
+    if (result.type === "text") {
+      reply = result.reply;
     }
-  }
 
+    if (result.type === "product_search") {
+      const data = result.data;
+
+      reply = `
+🚗 Vehicle: ${data.vehicle || "Not detected"}
+🔧 Part: ${data.part || "Not detected"}
+
+📍 Position:
+Front: ${data.position.front}
+Rear: ${data.position.rear}
+Left: ${data.position.left}
+Right: ${data.position.right}
+
+❌ No Product Found
+`;
+    }
+
+    await sendWhatsAppMessage(from, reply);
+
+    res.sendStatus(200);
+
+  } catch (error) {
+    console.error("❌ Webhook Error:", error.message);
+    res.sendStatus(500);
+  }
 };
