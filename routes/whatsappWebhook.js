@@ -4,187 +4,157 @@ const express = require("express");
 const router = express.Router();
 const fetch = require("node-fetch");
 
-const { handleAutoPartsFlow } = require("../flows/autoParts/entry");
-const aiParser = require("../services/aiParser");
+const { searchProducts } = require("../services/shopifyService");
+const { parseUserQuery } = require("../services/aiParser");
 
 // ==============================
-// 🔐 VERIFY WEBHOOK
+// 🔐 VERIFY WEBHOOK (GET)
 // ==============================
-router.get("/", (req, res) => {
-  const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+router.get("/webhook", (req, res) => {
+  const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
   if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("✅ WhatsApp Webhook Verified");
+    console.log("✅ Webhook Verified");
     return res.status(200).send(challenge);
+  } else {
+    return res.sendStatus(403);
   }
-
-  return res.sendStatus(403);
 });
 
 // ==============================
-// 📩 HANDLE INCOMING MESSAGES
+// 📩 RECEIVE MESSAGE (POST)
 // ==============================
-router.post("/", async (req, res) => {
+router.post("/webhook", async (req, res) => {
   try {
-    const body = req.body;
+    console.log("📥 RAW BODY:", JSON.stringify(req.body, null, 2));
 
-    console.log("📥 RAW BODY:", JSON.stringify(body, null, 2));
+    const entry = req.body.entry?.[0];
+    const changes = entry?.changes?.[0];
+    const value = changes?.value;
+    const message = value?.messages?.[0];
 
-    if (body.object) {
-      const entry = body.entry?.[0];
-      const changes = entry?.changes?.[0];
-      const value = changes?.value;
-
-      const message = value?.messages?.[0];
-
-      if (message) {
-        const from = message.from;
-
-        // 🔥 HANDLE TEXT + BUTTON INPUT
-        const text =
-          message.text?.body ||
-          message.button?.text ||
-          message.interactive?.button_reply?.id ||
-          "";
-
-        if (!text) {
-          console.log("⚠️ No valid message");
-          return res.sendStatus(200);
-        }
-
-        console.log("📩 Incoming:", text);
-
-        let reply;
-        const lowerText = text.toLowerCase();
-
-        // ==============================
-        // ⚡ SMART ROUTING
-        // ==============================
-
-        // 🔢 NUMBER (selection)
-        if (/^\d+$/.test(text)) {
-          reply = await handleAutoPartsFlow(from, text, null);
-        }
-
-        // ✅ YES / NO (confirmation)
-        else if (["yes", "no"].includes(lowerText)) {
-          reply = await handleAutoPartsFlow(from, text, null);
-        }
-
-        // 👋 GREETING
-        else if (
-          ["hi", "hello", "assalamualaikum", "salam"].includes(lowerText)
-        ) {
-          reply = {
-            message:
-              "👋 Welcome to NDX Automotive!\n\n" +
-              "Please tell me:\n" +
-              "🚗 Car Make + Model\n" +
-              "🔧 Part you need\n\n" +
-              "Example:\nToyota Corolla air filter",
-            buttons: []
-          };
-        }
-
-        // 🧠 AI PARSE
-        else {
-          const aiData = await aiParser(text);
-
-          if (!aiData || !aiData.part) {
-            reply = {
-              message:
-                "❌ Could not understand your request.\n\n" +
-                "Please try like:\nToyota Corolla air filter",
-              buttons: []
-            };
-          } else {
-            reply = await handleAutoPartsFlow(from, text, aiData);
-          }
-        }
-
-        console.log("📤 Reply:", reply);
-
-        // ==============================
-        // 📤 SEND MESSAGE
-        // ==============================
-        if (typeof reply === "object") {
-          await sendWhatsAppMessage(from, reply.message, reply.buttons);
-        } else {
-          await sendWhatsAppMessage(from, reply);
-        }
-      }
-
+    if (!message) {
       return res.sendStatus(200);
     }
 
-    return res.sendStatus(404);
+    const from = message.from;
+    const userText = message.text?.body;
+
+    console.log("👤 From:", from);
+    console.log("💬 Message:", userText);
+
+    // ==============================
+    // 👋 GREETING HANDLER
+    // ==============================
+    if (!userText || userText.toLowerCase() === "hi") {
+      const welcomeMsg = `👋 Welcome to NDX Automotive!
+
+Please tell me:
+🚗 Car Make + Model  
+🔧 Part you need  
+
+Example:
+Toyota Corolla air filter`;
+
+      await sendWhatsAppMessage(from, welcomeMsg);
+      return res.sendStatus(200);
+    }
+
+    // ==============================
+    // 🧠 AI PARSE QUERY
+    // ==============================
+    const query = await parseUserQuery(userText);
+
+    console.log("🧠 PARSED QUERY:", query);
+
+    if (!query || !query.part) {
+      await sendWhatsAppMessage(
+        from,
+        "❌ Could not understand your request.\n\nTry:\nToyota Corolla air filter"
+      );
+      return res.sendStatus(200);
+    }
+
+    // ==============================
+    // 🔍 SEARCH PRODUCTS
+    // ==============================
+    const products = await searchProducts(query);
+
+    console.log("📦 PRODUCTS FOUND:", products.length);
+
+    // ==============================
+    // ❌ NO PRODUCTS CASE
+    // ==============================
+    if (!products || products.length === 0) {
+      await sendWhatsAppMessage(
+        from,
+        `❌ No products found.\n\nTry:\n${query.make} ${query.model} ${query.part}`
+      );
+      return res.sendStatus(200);
+    }
+
+    // ==============================
+    // 📤 FORMAT RESPONSE
+    // ==============================
+    let reply = `🔧 *${query.make} ${query.model} ${query.part.toUpperCase()} Options:*\n\n`;
+
+    products.slice(0, 10).forEach((p, index) => {
+      reply += `${index + 1}. ${p.title}\n`;
+      reply += `💰 PKR ${p.price}\n`;
+      reply += `🔗 ${p.url}\n\n`;
+    });
+
+    reply += "👉 Reply with the *option number* to select product.";
+
+    console.log("📤 FINAL REPLY:", reply);
+
+    // ==============================
+    // 📲 SEND MESSAGE
+    // ==============================
+    await sendWhatsAppMessage(from, reply);
+
+    return res.sendStatus(200);
 
   } catch (error) {
-    console.error("❌ FULL ERROR:", error);
+    console.error("❌ Webhook Error:", error);
     return res.sendStatus(500);
   }
 });
 
 // ==============================
-// 📤 SEND WHATSAPP MESSAGE
+// 📲 SEND WHATSAPP MESSAGE
 // ==============================
-async function sendWhatsAppMessage(to, message, buttons = []) {
+async function sendWhatsAppMessage(to, text) {
+  const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const TOKEN = process.env.WHATSAPP_TOKEN;
+
   try {
-    const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-    const TOKEN = process.env.WHATSAPP_TOKEN;
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${TOKEN}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: to,
+          text: { body: text }
+        })
+      }
+    );
 
-    const url = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
+    const data = await response.json();
 
-    let payload;
-
-    // 🔥 INTERACTIVE BUTTON MESSAGE
-    if (buttons && buttons.length > 0) {
-      payload = {
-        messaging_product: "whatsapp",
-        to: to,
-        type: "interactive",
-        interactive: {
-          type: "button",
-          body: {
-            text: message
-          },
-          action: {
-            buttons: buttons.map(btn => ({
-              type: "reply",
-              reply: {
-                id: btn.id,
-                title: btn.title
-              }
-            }))
-          }
-        }
-      };
-    }
-
-    // 🔹 NORMAL TEXT MESSAGE
-    else {
-      payload = {
-        messaging_product: "whatsapp",
-        to: to,
-        text: { body: message }
-      };
-    }
-
-    await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
+    console.log("📤 WhatsApp API Response:", data);
 
   } catch (error) {
-    console.error("❌ Send Message Error:", error);
+    console.error("❌ WhatsApp Send Error:", error);
   }
 }
 
