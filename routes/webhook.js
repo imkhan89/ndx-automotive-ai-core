@@ -1,11 +1,11 @@
 const express = require("express");
 const router = express.Router();
 
-const webhookController = require("../controllers/webhookController");
+const { handleWebhook } = require("../controllers/webhookController");
 
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "ndestore_verify_token";
 
-// ✅ VERIFY
+// ✅ VERIFY WEBHOOK
 router.get("/", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -19,6 +19,6 @@ router.get("/", (req, res) => {
 });
 
 // ✅ RECEIVE MESSAGE
-router.post("/", webhookController.handleWebhook);
+router.post("/", handleWebhook);
 
 module.exports = router;
