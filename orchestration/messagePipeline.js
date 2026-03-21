@@ -2,17 +2,22 @@ const { parseUserInput } = require("../services/aiParser");
 const { runFlow } = require("./flowPipeline");
 const { sendTextMessage } = require("../services/whatsappService");
 
+const normalize = require("../ai/queryNormalizer");
+
 async function runMessagePipeline({ from, text }) {
   try {
-    // STEP 1: AI PARSE
+    // 🔹 STEP 1: Normalize (spelling + synonym)
+    text = normalize(text);
+
+    // 🔹 STEP 2: AI Parse (your existing system)
     const parsed = await parseUserInput(text);
 
     console.log("🧠 AI Parsed:", parsed);
 
-    // STEP 2: FLOW EXECUTION
+    // 🔹 STEP 3: Flow Execution
     const result = await runFlow(parsed, from);
 
-    // STEP 3: SEND RESPONSE
+    // 🔹 STEP 4: Send Response
     if (result?.reply) {
       await sendTextMessage(from, result.reply);
     }
@@ -20,7 +25,8 @@ async function runMessagePipeline({ from, text }) {
   } catch (error) {
     console.error("Pipeline Error:", error);
 
-    await sendTextMessage(from,
+    await sendTextMessage(
+      from,
       "⚠️ Something went wrong. Please try again."
     );
   }
