@@ -2,7 +2,6 @@
 
 const express = require("express");
 const router = express.Router();
-
 const fetch = require("node-fetch");
 
 const { handleAutoPartsFlow } = require("../flows/autoParts/entry");
@@ -58,6 +57,8 @@ router.post("/", async (req, res) => {
 
         let reply;
 
+        const lowerText = text.toLowerCase();
+
         // ==============================
         // ⚡ SMART ROUTING
         // ==============================
@@ -68,19 +69,30 @@ router.post("/", async (req, res) => {
         }
 
         // ✅ YES / NO → CONFIRMATION
-        else if (["yes", "no"].includes(text.toLowerCase())) {
+        else if (["yes", "no"].includes(lowerText)) {
           reply = await handleAutoPartsFlow(from, text, null);
         }
 
-        // 🧠 OTHERWISE → AI PARSE
+        // 👋 GREETING HANDLER
+        else if (
+          ["hi", "hello", "assalamualaikum", "salam"].includes(lowerText)
+        ) {
+          reply =
+            "👋 Welcome to NDX Automotive!\n\n" +
+            "Please tell me:\n" +
+            "🚗 Car Make + Model\n" +
+            "🔧 Part you need\n\n" +
+            "Example:\nToyota Corolla air filter";
+        }
+
+        // 🧠 AI PARSE
         else {
           const aiData = await aiParser(text);
 
-          // SAFETY CHECK
           if (!aiData || !aiData.part) {
-            console.log("⚠️ AI parsing failed:", aiData);
-
-            reply = "❌ Could not understand your request.\nPlease try like:\nToyota Corolla air filter";
+            reply =
+              "❌ Could not understand your request.\n\n" +
+              "Please try like:\nToyota Corolla air filter";
           } else {
             reply = await handleAutoPartsFlow(from, text, aiData);
           }
@@ -109,28 +121,33 @@ router.post("/", async (req, res) => {
 // 📤 SEND MESSAGE FUNCTION
 // ==============================
 async function sendWhatsAppMessage(to, message) {
-  const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-  const TOKEN = process.env.WHATSAPP_TOKEN;
+  try {
+    const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+    const TOKEN = process.env.WHATSAPP_TOKEN;
 
-  if (!PHONE_NUMBER_ID || !TOKEN) {
-    console.error("❌ Missing WhatsApp credentials");
-    return;
+    if (!PHONE_NUMBER_ID || !TOKEN) {
+      console.error("❌ Missing WhatsApp credentials");
+      return;
+    }
+
+    const url = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
+
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: to,
+        text: { body: message }
+      })
+    });
+
+  } catch (error) {
+    console.error("❌ Send Message Error:", error);
   }
-
-  const url = `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`;
-
-  await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${TOKEN}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to: to,
-      text: { body: message }
-    })
-  });
 }
 
 module.exports = router;
