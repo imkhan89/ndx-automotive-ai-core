@@ -1,81 +1,88 @@
-const { sendTextMessage } = require("../services/whatsappService");
 const { searchProducts } = require("../services/shopifyService");
+const { sendTextMessage } = require("../services/whatsappService");
 
-async function processUserMessage(user, text) {
-  try {
-    console.log("🧠 Processing AI for:", text);
+// 🔥 Extract intent
+function extractIntent(text) {
+  const lower = text.toLowerCase();
 
-    const message = (text || "").toLowerCase().trim();
+  let car = null;
+  let year = null;
+  let product = null;
 
-    // =====================================================
-    // ✅ STEP 1: HANDLE GREETINGS
-    // =====================================================
+  // 🚗 CAR DETECTION
+  if (lower.includes("corolla")) car = "corolla";
+  if (lower.includes("civic")) car = "civic";
+  if (lower.includes("city")) car = "city";
 
-    const greetings = ["hi", "hello", "salam", "assalamualaikum"];
+  // 📅 YEAR DETECTION
+  const yearMatch = lower.match(/\b(20\d{2}|19\d{2})\b/);
+  if (yearMatch) year = yearMatch[0];
 
-    if (greetings.includes(message)) {
-      await sendTextMessage(
-        user,
-        "👋 Welcome to ndestore.com!\n\n🚗 Please tell me:\n• Car model\n• Model year\n• Required part\n\nExample:\nCorolla 2015 air filter"
-      );
-      return;
-    }
+  // 🔧 PRODUCT DETECTION
+  if (lower.includes("air filter")) product = "air filter";
+  if (lower.includes("oil filter")) product = "oil filter";
+  if (lower.includes("brake pad")) product = "brake pad";
+  if (lower.includes("spark plug")) product = "spark plug";
 
-    // =====================================================
-    // ✅ STEP 2: HANDLE ORDER INTENT
-    // =====================================================
-
-    if (message.includes("order")) {
-      await sendTextMessage(
-        user,
-        "🚀 Great choice!\n\nPlease confirm:\n📍 City\n📞 Phone Number\n\nWe will process your order immediately."
-      );
-      return;
-    }
-
-    // =====================================================
-    // ✅ STEP 3: SEARCH PRODUCTS
-    // =====================================================
-
-    const products = await searchProducts(message);
-
-    // =====================================================
-    // ✅ STEP 4: NO RESULT HANDLING
-    // =====================================================
-
-    if (!products || products.length === 0) {
-      await sendTextMessage(
-        user,
-        "❌ No exact match found.\n\n👉 Please specify:\n• Car model\n• Model year\n• Part name\n\nExample:\nCorolla 2018 air filter"
-      );
-      return;
-    }
-
-    // =====================================================
-    // ✅ STEP 5: TOP RESULTS (CONVERSION OPTIMIZED)
-    // =====================================================
-
-    const topProducts = products.slice(0, 3);
-
-    let reply = "🔍 *Top Matches Found:*\n\n";
-
-    topProducts.forEach((product, index) => {
-      reply += `${index + 1}️⃣ ${product.title}\n`;
-      reply += `💰 Rs.${product.price}\n\n`;
-    });
-
-    reply += "🔥 Fast moving items\n";
-    reply += "🚚 Delivery all over Pakistan\n\n";
-    reply += "👉 Reply 1, 2, or 3 to select\n";
-    reply += "👉 Reply *ORDER* to confirm";
-
-    await sendTextMessage(user, reply);
-
-  } catch (error) {
-    console.error("❌ AI Controller Error:", error.message);
-  }
+  return { car, year, product };
 }
 
-module.exports = {
-  processUserMessage,
+// 🔥 Build smart query
+function buildSearchQuery(intent) {
+  let query = "";
+
+  if (intent.car) query += intent.car + " ";
+  if (intent.year) query += intent.year + " ";
+  if (intent.product) query += intent.product;
+
+  return query.trim();
+}
+
+exports.processUserMessage = async (from, userText) => {
+  try {
+    console.log("🧠 Processing AI for:", userText);
+
+    const intent = extractIntent(userText);
+
+    // ❌ If nothing understood
+    if (!intent.car && !intent.product) {
+      return await sendTextMessage(
+        from,
+        `👋 Welcome to ndestore.com!\n\n🚗 Please tell:\n• Car model\n• Product\n\nExample:\nCorolla 2015 air filter`
+      );
+    }
+
+    const query = buildSearchQuery(intent);
+
+    console.log("🔍 Search Query:", query);
+
+    const results = await searchProducts(query);
+
+    // ❌ No results
+    if (!results || results.length === 0) {
+      return await sendTextMessage(
+        from,
+        `❌ No exact match found.\n\n👉 Please specify:\n• Car model\n• Model year\n• Part name\n\nExample:\nCorolla 2018 air filter`
+      );
+    }
+
+    // ✅ Show top 3 results
+    let message = `🔍 Top Matches Found:\n\n`;
+
+    results.slice(0, 3).forEach((p, i) => {
+      message += `${i + 1}️⃣ ${p.title}\n💰 Rs. ${p.price}\n\n`;
+    });
+
+    message += `👉 Reply with product name to order`;
+
+    await sendTextMessage(from, message);
+
+  } catch (error) {
+    console.error("❌ AI Error:", error.message);
+
+    await sendTextMessage(
+      from,
+      "⚠️ Something went wrong. Please try again."
+    );
+  }
 };
