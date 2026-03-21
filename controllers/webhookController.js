@@ -18,10 +18,13 @@ module.exports = {
 
       console.log("💬 USER:", text);
 
-      // 🔥 NEW PIPELINE (REPLACES orchestration)
       const result = await processQuery(text);
 
-      await sendWhatsAppMessage(from, result.reply);
+      if (!result || !result.reply) {
+        await sendWhatsAppMessage(from, "⚠️ Unable to process your request. Please try again.");
+      } else {
+        await sendWhatsAppMessage(from, result.reply);
+      }
 
       return res.sendStatus(200);
 
