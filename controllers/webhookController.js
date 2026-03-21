@@ -12,18 +12,15 @@ const verifyWebhook = (req, res) => {
 
   if (mode && token === process.env.VERIFY_TOKEN) {
     return res.status(200).send(challenge);
-  } else {
-    return res.sendStatus(403);
   }
+  return res.sendStatus(403);
 };
 
 // ===============================
-// HANDLE WEBHOOK
+// HANDLE WEBHOOK (SAFE VERSION)
 // ===============================
 const handleWebhook = async (req, res) => {
   try {
-    console.log("🔥 WEBHOOK EVENT");
-
     res.sendStatus(200);
 
     const value = req.body.entry?.[0]?.changes?.[0]?.value;
@@ -33,7 +30,7 @@ const handleWebhook = async (req, res) => {
     const message = value.messages[0];
     const from = message.from;
 
-    let userText =
+    const userText =
       message.text?.body ||
       message.button?.text ||
       message.interactive?.button_reply?.title ||
@@ -42,42 +39,57 @@ const handleWebhook = async (req, res) => {
 
     console.log("💬 USER:", userText);
 
+    let reply = "⚠️ System busy, please try again.";
+
     // ===============================
-    // 🔹 SHOPIFY LIVE SEARCH
+    // 🛒 TRY SHOPIFY (SAFE)
     // ===============================
-    const products = await searchProducts(userText);
+    try {
+      const products = await searchProducts(userText);
 
-    let reply = "";
+      if (products.length > 0) {
+        reply = "🛒 *Available Products:*\n\n";
 
-    if (products.length > 0) {
-      reply = "🛒 *Available Products:*\n\n";
+        products.forEach((p, i) => {
+          const price = p.variants[0]?.price || "N/A";
+          const link = `https://${process.env.SHOPIFY_STORE}/products/${p.handle}`;
 
-      products.forEach((p, i) => {
-        const price = p.variants[0]?.price || "N/A";
-        const link = `https://${process.env.SHOPIFY_STORE}/products/${p.handle}`;
+          reply += `*${i + 1}. ${p.title}*\n`;
+          reply += `💰 PKR ${price}\n`;
+          reply += `🔗 ${link}\n\n`;
+        });
 
-        reply += `*${i + 1}. ${p.title}*\n`;
-        reply += `💰 PKR ${price}\n`;
-        reply += `🔗 ${link}\n\n`;
-      });
-
-      reply += "Reply with product name to confirm 👍";
-
-    } else {
-      reply = await generateAIResponse(userText);
+        reply += "Reply with product name to confirm 👍";
+      }
+    } catch (err) {
+      console.error("❌ Shopify Failed:", err.message);
     }
 
     // ===============================
-    // SEND
+    // 🤖 FALLBACK AI (SAFE)
     // ===============================
-    console.log("🚀 BEFORE SEND");
+    if (!reply.includes("Available Products")) {
+      try {
+        reply = await generateAIResponse(userText);
+      } catch (err) {
+        console.error("❌ AI Failed:", err.message);
+        reply = "Please share car model & part needed 👍";
+      }
+    }
 
-    const result = await sendTextMessage(from, reply);
-
-    console.log("📤 RESULT:", result);
+    // ===============================
+    // 📤 ALWAYS SEND (CRITICAL)
+    // ===============================
+    try {
+      console.log("🚀 SENDING MESSAGE...");
+      await sendTextMessage(from, reply);
+      console.log("✅ MESSAGE SENT");
+    } catch (err) {
+      console.error("❌ SEND FAILED:", err.message);
+    }
 
   } catch (error) {
-    console.error("❌ ERROR:", error.message);
+    console.error("❌ WEBHOOK ERROR:", error.message);
   }
 };
 
@@ -85,31 +97,23 @@ const handleWebhook = async (req, res) => {
 // AI RESPONSE
 // ===============================
 const generateAIResponse = async (text) => {
-  try {
-    const res = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "You are an automotive sales assistant for ndestore.com",
-          },
-          { role: "user", content: text },
-        ],
+  const res = await axios.post(
+    "https://api.openai.com/v1/chat/completions",
+    {
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Automotive assistant for ndestore.com" },
+        { role: "user", content: text },
+      ],
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-      }
-    );
+    }
+  );
 
-    return res.data.choices[0].message.content;
-
-  } catch (err) {
-    return "Please share your car model & part 👍";
-  }
+  return res.data.choices[0].message.content;
 };
 
 module.exports = {
