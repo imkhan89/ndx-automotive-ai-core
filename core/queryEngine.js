@@ -1,49 +1,35 @@
-const { parseQueryAI } = require("../ai/queryParser");
-const { normalizePart } = require("../ai/synonymEngine");
-const { extractPosition } = require("../engine/positionEngine");
-const { matchProduct } = require("../utils/productMatcher");
+const parseQuery = require("../ai/queryParser");
 
-const processQuery = async (message) => {
-  try {
-    // 🧠 Step 1: AI Parse (vehicle extraction)
-    const parsed = await parseQueryAI(message);
+function detectIntent(message) {
+  const msg = message.toLowerCase();
 
-    // 🔧 Step 2: Part detection
-    const part = normalizePart(message);
+  if (["hi", "hello", "aoa", "assalamualaikum"].some(w => msg.includes(w))) {
+    return "greeting";
+  }
 
-    // 📍 Step 3: Position detection
-    const position = extractPosition(message);
+  if (msg.length < 3) return "unknown";
 
-    // 🔎 Step 4: Product match
-    const product = await matchProduct({
-      ...parsed,
-      part,
-      position
-    });
+  return "product_search";
+}
 
-    // 🧾 Step 5: Response formatting
-    const reply = `
-🚗 Vehicle: ${parsed.make || ""} ${parsed.model || ""} ${parsed.year || ""}
+async function processQuery(message) {
+  const intent = detectIntent(message);
 
-🔧 Part: ${part || "Not detected"}
-
-📍 Position:
-${JSON.stringify(position, null, 2)}
-
-${product ? "✅ Product Found" : "❌ No Product Found"}
-`;
-
-    return { reply };
-
-  } catch (error) {
-    console.error("❌ Query Engine Error:", error.message);
-
+  // 👉 Greeting handling
+  if (intent === "greeting") {
     return {
-      reply: "⚠️ System error. Please try again."
+      type: "text",
+      reply: "👋 Welcome to NDE Store!\nPlease tell me your car model and required part."
     };
   }
-};
 
-module.exports = {
-  processQuery
-};
+  // 👉 Product search
+  const parsed = await parseQuery(message);
+
+  return {
+    type: "product_search",
+    data: parsed
+  };
+}
+
+module.exports = { processQuery };
