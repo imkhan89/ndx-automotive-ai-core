@@ -1,6 +1,6 @@
-const { handleUserQuery } = require("../app/services/queryService");
-const { sendWhatsAppMessage } = require("../services/whatsappService");
+const { runMessagePipeline } = require("../orchestration/messagePipeline");
 
+// 🔥 In-memory state (replace with Redis later)
 const userState = {};
 
 exports.handleWebhook = async (req, res) => {
@@ -16,15 +16,19 @@ exports.handleWebhook = async (req, res) => {
 
     console.log("💬 Incoming:", text);
 
+    // ✅ FIX: Initialize state properly
     if (!userState[from]) {
       userState[from] = {};
     }
 
     const state = userState[from];
 
-    const reply = await handleUserQuery(text, state);
-
-    await sendWhatsAppMessage(from, reply);
+    // ✅ Pass state into pipeline
+    await runMessagePipeline({
+      from,
+      text,
+      state
+    });
 
     res.sendStatus(200);
 
