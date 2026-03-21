@@ -1,55 +1,28 @@
-// ==============================
-// 🚀 NDX AUTOMOTIVE AI SERVER
-// ==============================
+require("dotenv").config();
 
 const express = require("express");
-const dotenv = require("dotenv");
+const bodyParser = require("body-parser");
 
-// Load environment variables
-dotenv.config();
-
-// Initialize app
 const app = express();
 
-// ==============================
-// 🔧 MIDDLEWARE
-// ==============================
+// ✅ Middleware
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// Parse incoming JSON (required for WhatsApp webhook)
-app.use(express.json());
+// ✅ Routes
+const webhookRoutes = require("./routes/webhook");
 
-// ==============================
-// 📥 ROUTES
-// ==============================
+// IMPORTANT: This maps /webhook correctly
+app.use("/webhook", webhookRoutes);
 
-// Import WhatsApp webhook route
-const whatsappWebhook = require("./routes/whatsappWebhook");
-
-// ✅ IMPORTANT: mount at root
-app.use("/", whatsappWebhook);
-
-// ==============================
-// 🧪 HEALTH CHECK ROUTES
-// ==============================
-
-// Root test
+// ✅ Health check (Railway)
 app.get("/", (req, res) => {
-  res.status(200).send("🚀 NDX Automotive AI Server is LIVE");
+  res.status(200).send("🚀 ndestore WhatsApp AI is running");
 });
 
-// Webhook test (optional debug)
-app.get("/webhook-test", (req, res) => {
-  res.status(200).send("✅ Webhook route is working");
-});
-
-// ==============================
-// 🚀 START SERVER
-// ==============================
-
-const PORT = process.env.PORT || 8080;
+// ✅ Start server
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("=================================");
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log("=================================");
+  console.log(`✅ Server running on port ${PORT}`);
 });
