@@ -1,5 +1,4 @@
 const autoPartsEntry = require("../flows/autoParts/entry");
-const chatFlow = require("../flows/chatFlow");
 const { extractAutoIntent } = require("../services/aiParser");
 
 // ===============================
@@ -12,12 +11,9 @@ const routeMessage = async (userId, message) => {
     console.log("🧠 Routing message:", text);
 
     // ===============================
-    // 🔹 HANDLE EXISTING SESSION FIRST
+    // 🔹 CONTINUE EXISTING FLOW
     // ===============================
-    // If user already inside autoParts flow → continue flow
-    const autoPartsFlow = require("../flows/autoParts/entry");
-
-    if (autoPartsFlow.isUserInFlow && autoPartsFlow.isUserInFlow(userId)) {
+    if (autoPartsEntry.isUserInFlow(userId)) {
       console.log("🔁 Continuing existing autoParts flow");
       return await autoPartsEntry.handleAutoPartsFlow(userId, message);
     }
@@ -31,11 +27,11 @@ const routeMessage = async (userId, message) => {
       aiData = await extractAutoIntent(message);
       console.log("🤖 AI Extracted:", aiData);
     } catch (err) {
-      console.error("⚠️ AI failed, fallback to keyword detection");
+      console.error("⚠️ AI failed:", err.message);
     }
 
     // ===============================
-    // 🔹 AUTO PARTS FLOW (AI BASED)
+    // 🔹 AUTO PARTS FLOW (AI)
     // ===============================
     if (aiData && aiData.part) {
       console.log("🚗 AutoParts Flow Triggered (AI)");
@@ -48,7 +44,7 @@ const routeMessage = async (userId, message) => {
     }
 
     // ===============================
-    // 🔹 KEYWORD FALLBACK (IMPORTANT)
+    // 🔹 KEYWORD FALLBACK
     // ===============================
     if (
       text.includes("filter") ||
@@ -60,21 +56,25 @@ const routeMessage = async (userId, message) => {
     ) {
       console.log("🚗 AutoParts Flow Triggered (Keyword)");
 
-      return await autoPartsEntry.handleAutoPartsFlow(
-        userId,
-        message
-      );
+      return await autoPartsEntry.handleAutoPartsFlow(userId, message);
     }
 
     // ===============================
-    // 🔹 DEFAULT CHAT FLOW
+    // 🔹 SAFE DEFAULT RESPONSE
     // ===============================
-    console.log("🤖 Chat Flow Triggered");
+    return `👋 Welcome to NDE Store!
 
-    return await chatFlow(userId, message);
+Please tell me:
+🚗 Car Make (e.g. Toyota)
+🚘 Model (e.g. Corolla)
+🔧 Part (e.g. air filter)
+
+Example:
+👉 Corolla 2015 air filter`;
 
   } catch (err) {
     console.error("❌ Router error:", err.message);
+    return "⚠️ System error. Please try again.";
   }
 };
 
