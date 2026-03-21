@@ -1,31 +1,35 @@
 const { processQuery } = require("../engine/processors/queryProcessor");
+const { whatsappFormatter } = require("../interface/formatters/whatsappFormatter");
 const { sendWhatsAppMessage } = require("../services/whatsappService");
 
 // ✅ MAIN PIPELINE
-const runMessagePipeline = async ({ from, text }) => {
+const runMessagePipeline = async ({ from, text, state = {} }) => {
   try {
     console.log("📥 Incoming Message:", text);
+    console.log("📦 Current State:", state);
 
-    // 🔹 STEP 1: PROCESS QUERY (ENGINE)
-    const result = processQuery(text);
-
-    console.log("🧠 Processed Result:", result);
-
-    // 🔹 STEP 2: EXTRACT DATA
-    const { part, positions, intent } = result.data || {};
-
-    // 🔹 STEP 3: BUILD RESPONSE (TEMP FORMAT)
     let reply = "";
 
-    if (intent === "PART_SEARCH") {
-      reply = `🔧 Part: ${part || "Not detected"}\n📍 Position: ${
-        positions?.join(", ") || "Not specified"
-      }`;
-    } else {
-      reply = "👋 Welcome to ND Auto Parts\nHow can I help you today?";
+    // 🔴 FIRST TIME → SHOW MENU
+    if (!state.step) {
+      reply = whatsappFormatter("menu", null, state);
     }
 
-    // 🔹 STEP 4: SEND TO WHATSAPP
+    // 🔴 MENU HANDLING
+    else if (state.step === "menu") {
+      reply = whatsappFormatter("menu_selection", text, state);
+    }
+
+    // 🔴 AUTO PARTS FLOW
+    else if (state.step === "auto_parts") {
+
+      const result = processQuery(text);
+      const data = result.data || {};
+
+      reply = whatsappFormatter("product_result", data, state);
+    }
+
+    // 🔹 SEND MESSAGE
     await sendWhatsAppMessage(from, reply);
 
     console.log("✅ Reply Sent:", reply);
@@ -35,7 +39,6 @@ const runMessagePipeline = async ({ from, text }) => {
   } catch (error) {
     console.error("❌ Pipeline Error:", error);
 
-    // fallback reply
     await sendWhatsAppMessage(
       from,
       "⚠️ Sorry, something went wrong. Please try again."
