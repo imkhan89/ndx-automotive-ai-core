@@ -4,22 +4,26 @@ const { extractPosition } = require("../engine/positionEngine");
 const { matchProduct } = require("../utils/productMatcher");
 
 const processQuery = async (message) => {
+  try {
+    // 🧠 Step 1: AI Parse (vehicle extraction)
+    const parsed = await parseQueryAI(message);
 
-  const parsed = await parseQueryAI(message);
+    // 🔧 Step 2: Part detection
+    const part = normalizePart(message);
 
-  const part = normalizePart(message);
+    // 📍 Step 3: Position detection
+    const position = extractPosition(message);
 
-  const position = extractPosition(message);
+    // 🔎 Step 4: Product match
+    const product = await matchProduct({
+      ...parsed,
+      part,
+      position
+    });
 
-  const product = await matchProduct({
-    ...parsed,
-    part,
-    position
-  });
-
-  return {
-    reply: `
-🚗 ${parsed.make || ""} ${parsed.model || ""} ${parsed.year || ""}
+    // 🧾 Step 5: Response formatting
+    const reply = `
+🚗 Vehicle: ${parsed.make || ""} ${parsed.model || ""} ${parsed.year || ""}
 
 🔧 Part: ${part || "Not detected"}
 
@@ -27,8 +31,17 @@ const processQuery = async (message) => {
 ${JSON.stringify(position, null, 2)}
 
 ${product ? "✅ Product Found" : "❌ No Product Found"}
-`
-  };
+`;
+
+    return { reply };
+
+  } catch (error) {
+    console.error("❌ Query Engine Error:", error.message);
+
+    return {
+      reply: "⚠️ System error. Please try again."
+    };
+  }
 };
 
 module.exports = {
