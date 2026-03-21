@@ -1,4 +1,4 @@
-const shopify = require("../../services/shopifyOrderService");
+const shopify = require("../../services/shopifyService");
 const stateRepo = require("../../state/stateRepository");
 
 module.exports = async (user, text, state) => {
