@@ -1,42 +1,45 @@
-const synonymMap = require("../../utils/synonymMap");
+// ✅ Internal synonym map (NO external dependency)
+const synonymMap = {
+  "filter": "air filter",
+  "air cleaner": "air filter",
+  "oil": "oil filter",
+  "engine oil filter": "oil filter",
 
-const detectIntent = (text = "") => {
-  const lower = text.toLowerCase();
+  "brake pad": "brake pads",
+  "brake pads": "brake pads",
+  "pads": "brake pads",
 
-  let intent = "unknown";
+  "disc": "brake disc",
+  "rotor": "brake disc",
 
-  if (
-    lower.includes("price") ||
-    lower.includes("cost") ||
-    lower.includes("kit")
-  ) {
-    intent = "purchase";
-  } else if (
-    lower.includes("available") ||
-    lower.includes("have") ||
-    lower.includes("stock")
-  ) {
-    intent = "availability";
-  } else if (
-    lower.includes("what") ||
-    lower.includes("which")
-  ) {
-    intent = "inquiry";
-  }
+  "plug": "spark plug",
+  "spark plugs": "spark plug",
 
-  return intent;
+  "wishbone": "control arm",
+  "lower arm": "control arm",
+  "upper arm": "control arm"
 };
 
-const extractEntities = (text = "") => {
-  const normalized = synonymMap(text);
+// ✅ Intent Mapper Function
+const mapIntent = (text = "") => {
+  const input = text.toLowerCase();
+
+  let detectedPart = null;
+
+  for (const key in synonymMap) {
+    if (input.includes(key)) {
+      detectedPart = synonymMap[key];
+      break;
+    }
+  }
 
   return {
-    raw: text,
-    normalized
+    original: text,
+    normalized: detectedPart || text,
+    intent: detectedPart ? "PART_SEARCH" : "GENERAL_QUERY"
   };
 };
 
 module.exports = {
-  detectIntent,
-  extractEntities
+  mapIntent
 };
