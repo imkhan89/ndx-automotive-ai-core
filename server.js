@@ -1,96 +1,55 @@
-// FILE: server.js
-
-require("dotenv").config();
+// ==============================
+// 🚀 NDX AUTOMOTIVE AI SERVER
+// ==============================
 
 const express = require("express");
-const app = express();
+const dotenv = require("dotenv");
 
-// ==============================
-// 🔥 IMPORT ROUTES & SERVICES
-// ==============================
-const whatsappWebhook = require("./routes/whatsappWebhook");
-const aiParser = require("./services/aiParser");
+// Load environment variables
+dotenv.config();
+
+// Initialize app
+const app = express();
 
 // ==============================
 // 🔧 MIDDLEWARE
 // ==============================
+
+// Parse incoming JSON (required for WhatsApp webhook)
 app.use(express.json());
 
 // ==============================
-// 🏠 ROOT ROUTE (VERSION CHECK)
+// 📥 ROUTES
 // ==============================
+
+// Import WhatsApp webhook route
+const whatsappWebhook = require("./routes/whatsappWebhook");
+
+// ✅ IMPORTANT: mount at root
+app.use("/", whatsappWebhook);
+
+// ==============================
+// 🧪 HEALTH CHECK ROUTES
+// ==============================
+
+// Root test
 app.get("/", (req, res) => {
-  res.send("🚀 NDX Automotive AI Server Running v2");
+  res.status(200).send("🚀 NDX Automotive AI Server is LIVE");
 });
 
-// ==============================
-// 🧪 HEALTH CHECK
-// ==============================
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    status: "OK",
-    service: "NDX Automotive AI",
-    version: "v2",
-    time: new Date()
-  });
-});
-
-// ==============================
-// 🧠 TEST AI
-// ==============================
-app.post("/test-ai", async (req, res) => {
-  try {
-    const { message } = req.body;
-
-    if (!message) {
-      return res.status(400).json({ error: "Message is required" });
-    }
-
-    const parsed = await aiParser(message);
-
-    res.json({
-      input: message,
-      parsed
-    });
-
-  } catch (error) {
-    console.error("❌ AI Error:", error);
-    res.status(500).json({ error: "AI parsing failed" });
-  }
-});
-
-// ==============================
-// 📲 WHATSAPP WEBHOOK
-// ==============================
-app.use("/webhook", whatsappWebhook);
-
-// ==============================
-// 🧪 DEBUG ROUTE (CRITICAL)
-// ==============================
+// Webhook test (optional debug)
 app.get("/webhook-test", (req, res) => {
-  res.send("✅ Webhook route is working");
-});
-
-// ==============================
-// ❌ 404 HANDLER
-// ==============================
-app.use((req, res) => {
-  res.status(404).send("Not Found");
-});
-
-// ==============================
-// 🚨 GLOBAL ERROR HANDLER
-// ==============================
-app.use((err, req, res, next) => {
-  console.error("❌ Server Error:", err);
-  res.status(500).json({ error: "Internal Server Error" });
+  res.status(200).send("✅ Webhook route is working");
 });
 
 // ==============================
 // 🚀 START SERVER
 // ==============================
-const PORT = process.env.PORT || 3000;
+
+const PORT = process.env.PORT || 8080;
 
 app.listen(PORT, () => {
+  console.log("=================================");
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log("=================================");
 });
