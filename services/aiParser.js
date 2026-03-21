@@ -1,38 +1,64 @@
-const OpenAI = require("openai");
+const axios = require("axios");
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-async function parseUserInput(text) {
-  const prompt = `
-You are an automotive expert for ndestore.com.
-
-Extract:
-- product
-- car make
-- model
-- year
-- intent (search / order)
-
-User: "${text}"
-
-Return JSON only:
-`;
-
-  const res = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }],
-  });
-
+// ===============================
+// 🔥 EXTRACT AUTO INTENT
+// ===============================
+const extractAutoIntent = async (message) => {
   try {
-    return JSON.parse(res.choices[0].message.content);
-  } catch {
-    return {
-      intent: "search",
-      product: text,
-    };
-  }
+    const res = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `
+Extract structured automotive data.
+
+Return ONLY valid JSON:
+
+{
+  "make": "",
+  "model": "",
+  "year": "",
+  "part": ""
 }
 
-module.exports = { parseUserInput };
+Rules:
+- Detect brand (Toyota, Honda, Suzuki, etc.)
+- Detect model (Corolla, Civic, Wagon R, etc.)
+- Detect year if present
+- Detect part (air filter, brake pads, spark plug, oil filter, etc.)
+- If missing → return empty string
+            `
+          },
+          {
+            role: "user",
+            content: message
+          }
+        ],
+        temperature: 0
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const content = res.data.choices[0].message.content;
+
+    console.log("🤖 AI RAW:", content);
+
+    return JSON.parse(content);
+
+  } catch (err) {
+    console.error("❌ AI Parser Error:", err.message);
+    return null;
+  }
+};
+
+module.exports = {
+  extractAutoIntent
+};
