@@ -6,7 +6,14 @@ const { searchProducts } = require("../../services/shopifyService");
 const userSessions = {};
 
 // ===============================
-// 🔥 CLASSIFY PRODUCT TYPE
+// 🔹 CHECK ACTIVE FLOW
+// ===============================
+const isUserInFlow = (userId) => {
+  return !!userSessions[userId];
+};
+
+// ===============================
+// 🔹 CLASSIFY PRODUCTS
 // ===============================
 function classifyProduct(title) {
   const t = title.toLowerCase();
@@ -19,7 +26,7 @@ function classifyProduct(title) {
 }
 
 // ===============================
-// 🔥 FORMAT RESPONSE
+// 🔹 FORMAT RESPONSE
 // ===============================
 function formatProductList(products, queryText) {
   let premium = [];
@@ -66,7 +73,7 @@ function formatProductList(products, queryText) {
 }
 
 // ===============================
-// 🔥 MAIN FLOW
+// 🔥 MAIN FLOW HANDLER
 // ===============================
 async function handleAutoPartsFlow(userId, message, aiData = null) {
   try {
@@ -76,14 +83,14 @@ async function handleAutoPartsFlow(userId, message, aiData = null) {
     // 🔹 STEP 1: SEARCH
     // ===============================
     if (!session.step) {
-      // ✅ Build search query
       let queryText = message;
 
+      // ✅ Use AI structured data if available
       if (aiData && typeof aiData === "object") {
         queryText = `${aiData.make || ""} ${aiData.model || ""} ${aiData.part || ""}`.trim();
       }
 
-      console.log("🔍 Searching for:", queryText);
+      console.log("🔍 Searching:", queryText);
 
       const results = await searchProducts(queryText);
 
@@ -101,7 +108,7 @@ async function handleAutoPartsFlow(userId, message, aiData = null) {
     }
 
     // ===============================
-    // 🔹 STEP 2: SELECT PRODUCT
+    // 🔹 STEP 2: PRODUCT SELECTION
     // ===============================
     if (session.step === "SELECTING") {
       const index = parseInt(message);
@@ -123,7 +130,7 @@ async function handleAutoPartsFlow(userId, message, aiData = null) {
     }
 
     // ===============================
-    // 🔹 STEP 3: CONFIRM ORDER
+    // 🔹 STEP 3: CONFIRMATION
     // ===============================
     if (session.step === "CONFIRMING") {
       const lower = message.toLowerCase();
@@ -156,5 +163,6 @@ async function handleAutoPartsFlow(userId, message, aiData = null) {
 }
 
 module.exports = {
-  handleAutoPartsFlow
+  handleAutoPartsFlow,
+  isUserInFlow
 };
