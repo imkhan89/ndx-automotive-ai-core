@@ -22,7 +22,9 @@ const processQuery = async (message) => {
 🚗 ${parsed.make || ""} ${parsed.model || ""} ${parsed.year || ""}
 
 🔧 Part: ${part || "Not detected"}
-📍 Position: ${JSON.stringify(position)}
+
+📍 Position:
+${JSON.stringify(position, null, 2)}
 
 ${product ? "✅ Product Found" : "❌ No Product Found"}
 `
