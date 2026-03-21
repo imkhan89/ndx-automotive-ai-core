@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { handleWebhook } = require("../controllers/webhookController");
+const webhookController = require("../controllers/webhookController");
 
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "ndestore_verify_token";
 
@@ -15,7 +15,7 @@ router.get("/", (req, res) => {
 
   console.log("🔍 Verification request received");
 
-  if (mode && token === VERIFY_TOKEN) {
+  if (mode === "subscribe" && token === VERIFY_TOKEN) {
     console.log("✅ Webhook verified");
     return res.status(200).send(challenge);
   }
@@ -28,15 +28,6 @@ router.get("/", (req, res) => {
 // =====================================================
 // ✅ RECEIVE WHATSAPP MESSAGES (POST)
 // =====================================================
-router.post("/", async (req, res) => {
-  console.log("🔥 Webhook POST HIT");
-
-  try {
-    await handleWebhook(req, res);
-  } catch (error) {
-    console.error("❌ Route Error:", error);
-    res.sendStatus(500);
-  }
-});
+router.post("/", webhookController.handleWebhook);
 
 module.exports = router;
