@@ -6,13 +6,6 @@ const { searchProducts } = require("../../services/shopifyService");
 const userSessions = {};
 
 // ===============================
-// 🔹 CHECK ACTIVE FLOW
-// ===============================
-const isUserInFlow = (userId) => {
-  return !!userSessions[userId];
-};
-
-// ===============================
 // 🔹 CLASSIFY PRODUCTS
 // ===============================
 function classifyProduct(title) {
@@ -67,102 +60,123 @@ function formatProductList(products, queryText) {
   addSection("🥉 Budget Options:", budget);
   addSection("🔹 Other Options:", standard);
 
-  message += "👉 Reply with the *option number* to select product.";
+  message += "👉 Reply with the option number to select product.";
 
   return message;
 }
 
 // ===============================
-// 🔥 MAIN FLOW HANDLER
+// 🔥 MAIN ENTRY FUNCTION (FIXED)
 // ===============================
-async function handleAutoPartsFlow(userId, message, aiData = null) {
+async function autoPartsEntry(user, text, state) {
   try {
-    const session = userSessions[userId] || {};
+
+    const session = userSessions[user] || {};
 
     // ===============================
     // 🔹 STEP 1: SEARCH
     // ===============================
     if (!session.step) {
-      let queryText = message;
 
-      // ✅ Use AI structured data if available
-      if (aiData && typeof aiData === "object") {
-        queryText = `${aiData.make || ""} ${aiData.model || ""} ${aiData.part || ""}`.trim();
+      const queryText = text;
+
+      if (!queryText) {
+        return {
+          reply: "🔍 Please enter product (e.g., Corolla air filter)"
+        };
       }
-
-      console.log("🔍 Searching:", queryText);
 
       const results = await searchProducts(queryText);
 
       if (!results.length) {
-        return "❌ No products found. Please refine your query (e.g., Corolla 2015 air filter).";
+        return {
+          reply: "❌ No products found. Try again."
+        };
       }
 
-      userSessions[userId] = {
+      userSessions[user] = {
         step: "SELECTING",
         products: results,
         query: queryText
       };
 
-      return formatProductList(results, queryText);
+      return {
+        reply: formatProductList(results, queryText)
+      };
     }
 
     // ===============================
-    // 🔹 STEP 2: PRODUCT SELECTION
+    // 🔹 STEP 2: SELECT PRODUCT
     // ===============================
     if (session.step === "SELECTING") {
-      const index = parseInt(message);
+
+      const index = parseInt(text);
 
       if (isNaN(index) || index < 1 || index > session.products.length) {
-        return "❌ Invalid selection. Please reply with a valid option number.";
+        return {
+          reply: "❌ Invalid selection. Reply with valid number."
+        };
       }
 
-      const selectedProduct = session.products[index - 1];
+      const product = session.products[index - 1];
 
-      userSessions[userId].step = "CONFIRMING";
-      userSessions[userId].selectedProduct = selectedProduct;
+      userSessions[user].step = "CONFIRMING";
+      userSessions[user].selectedProduct = product;
 
-      return `🛒 *Order Summary:*\n\n` +
-        `📦 ${selectedProduct.title}\n` +
-        `💰 PKR ${selectedProduct.price}\n` +
-        `🔗 ${selectedProduct.url}\n\n` +
-        `👉 Reply *YES* to confirm order\n👉 Reply *NO* to cancel`;
+      return {
+        reply:
+          `🛒 Order Summary:\n\n` +
+          `📦 ${product.title}\n` +
+          `💰 PKR ${product.price}\n\n` +
+          `Reply YES to confirm\nReply NO to cancel`
+      };
     }
 
     // ===============================
-    // 🔹 STEP 3: CONFIRMATION
+    // 🔹 STEP 3: CONFIRM
     // ===============================
     if (session.step === "CONFIRMING") {
-      const lower = message.toLowerCase();
+
+      const lower = text.toLowerCase();
 
       if (lower === "yes") {
         const product = session.selectedProduct;
+        delete userSessions[user];
 
-        delete userSessions[userId];
-
-        return `✅ *Order Confirmed!*\n\n` +
-          `📦 ${product.title}\n` +
-          `💰 PKR ${product.price}\n\n` +
-          `🚚 Our team will contact you shortly.`;
+        return {
+          reply:
+            `✅ Order Confirmed!\n\n` +
+            `📦 ${product.title}\n` +
+            `💰 PKR ${product.price}\n\n` +
+            `Our team will contact you.`
+        };
       }
 
       if (lower === "no") {
-        delete userSessions[userId];
-        return "❌ Order cancelled. You can search again anytime.";
+        delete userSessions[user];
+
+        return {
+          reply: "❌ Order cancelled."
+        };
       }
 
-      return "❗ Please reply with *YES* or *NO*.";
+      return {
+        reply: "❗ Reply YES or NO"
+      };
     }
 
-    return "⚠️ Something went wrong. Please try again.";
+    return {
+      reply: "⚠️ Restarting flow..."
+    };
 
-  } catch (err) {
-    console.error("❌ AutoParts Flow Error:", err.message);
-    return "⚠️ System error. Please try again.";
+  } catch (error) {
+    console.error("AutoParts Error:", error);
+
+    return {
+      reply: "⚠️ Auto Parts error. Try again."
+    };
   }
 }
 
-module.exports = {
-  handleAutoPartsFlow,
-  isUserInFlow
-};
+// ✅ EXPORT FIXED
+module.exports = autoPartsEntry;
