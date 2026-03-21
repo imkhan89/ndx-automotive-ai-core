@@ -1,23 +1,32 @@
 const productMap = require("./productMap");
 
-const findProductMatch = (message) => {
-  const text = message.toLowerCase();
+const matchProduct = async ({ make, model, year, part, position }) => {
+  if (!part) return null;
 
   for (const vehicle of productMap) {
-    const vehicleMatch = vehicle.keywords.some((k) =>
-      text.includes(k)
-    );
 
-    if (vehicleMatch) {
-      for (const product of vehicle.products) {
-        const productMatch = product.keywords.some((k) =>
-          text.includes(k)
-        );
+    const vehicleMatch =
+      (!make || vehicle.make?.toLowerCase() === make?.toLowerCase()) &&
+      (!model || vehicle.model?.toLowerCase() === model?.toLowerCase());
 
-        if (productMatch) {
-          return product;
-        }
+    if (!vehicleMatch) continue;
+
+    for (const product of vehicle.products) {
+
+      const partMatch = product.part?.toLowerCase() === part;
+
+      if (!partMatch) continue;
+
+      // Optional position filtering
+      if (product.position) {
+        const matchPosition = Object.keys(position || {}).every(key => {
+          return !product.position[key] || position[key];
+        });
+
+        if (!matchPosition) continue;
       }
+
+      return product;
     }
   }
 
@@ -25,5 +34,5 @@ const findProductMatch = (message) => {
 };
 
 module.exports = {
-  findProductMatch,
+  matchProduct
 };
