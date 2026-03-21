@@ -1,8 +1,10 @@
-const shopify = require("../../services/shopifyProductService");
+const shopify = require("../../services/shopifyService");
 const stateRepo = require("../../state/stateRepository");
 
 const rank = require("../../decisions/productRankingDecision");
 const fallback = require("../../decisions/fallbackDecision");
+
+const send = require("../../services/whatsappService").send;
 
 module.exports = async (user, text, state) => {
 
@@ -13,7 +15,7 @@ module.exports = async (user, text, state) => {
   const check = fallback(products);
 
   if (check.type === "no_results") {
-    return require("../../services/whatsappService").send(
+    return send(
       user,
       "No products found. Type 'menu' to restart or 'support' for help."
     );
