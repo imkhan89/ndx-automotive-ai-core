@@ -1,31 +1,38 @@
 const OpenAI = require("openai");
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-const parseQueryAI = async (message) => {
+async function parseQuery(message) {
   try {
-    const response = await client.chat.completions.create({
+    const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
           content: `
-You are an automotive query parser.
+You are an automotive AI.
 
 Extract:
-- make
-- model
-- year
+- vehicle make/model/year
+- part name
+- position (front/rear/left/right/upper/lower/inner/outer)
 
-Return ONLY valid JSON.
-
-Example:
+Return JSON only:
 {
-  "make": "Toyota",
-  "model": "Corolla",
-  "year": "2017"
+  "vehicle": "",
+  "part": "",
+  "position": {
+    "front": false,
+    "rear": false,
+    "left": false,
+    "right": false,
+    "upper": false,
+    "lower": false,
+    "inner": false,
+    "outer": false
+  }
 }
 `
         },
@@ -37,21 +44,19 @@ Example:
       temperature: 0
     });
 
-    const raw = response.choices[0].message.content;
+    const text = response.choices[0].message.content;
 
-    try {
-      return JSON.parse(raw);
-    } catch (err) {
-      console.error("JSON Parse Error:", raw);
-      return { raw: message };
-    }
+    return JSON.parse(text);
 
-  } catch (err) {
-    console.error("AI Parse Error:", err.message);
-    return { raw: message };
+  } catch (error) {
+    console.error("❌ AI Parser Error:", error.message);
+
+    return {
+      vehicle: null,
+      part: null,
+      position: {}
+    };
   }
-};
+}
 
-module.exports = {
-  parseQueryAI
-};
+module.exports = parseQuery;
