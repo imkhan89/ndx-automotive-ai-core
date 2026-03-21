@@ -1,20 +1,15 @@
 const axios = require("axios");
 
-// ===============================
-// 🔹 SEND TEXT MESSAGE FUNCTION
-// ===============================
 const sendTextMessage = async (to, message) => {
   try {
     const url = `https://graph.facebook.com/v18.0/${process.env.PHONE_NUMBER_ID}/messages`;
 
-    const response = await axios.post(
+    const res = await axios.post(
       url,
       {
         messaging_product: "whatsapp",
-        to: to,
-        text: {
-          body: message,
-        },
+        to,
+        text: { body: message },
       },
       {
         headers: {
@@ -24,19 +19,11 @@ const sendTextMessage = async (to, message) => {
       }
     );
 
-    console.log("✅ WhatsApp API Response:", response.data);
+    return res.data;
 
-    return response.data;
   } catch (error) {
-    console.error(
-      "❌ WhatsApp Send Error:",
-      error.response?.data || error.message
-    );
-
-    return null;
+    console.error("WhatsApp error:", error.response?.data || error.message);
   }
 };
 
-module.exports = {
-  sendTextMessage,
-};
+module.exports = { sendTextMessage };
