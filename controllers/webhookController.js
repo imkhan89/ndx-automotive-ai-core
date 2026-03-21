@@ -1,5 +1,6 @@
 const axios = require("axios");
 const { sendTextMessage } = require("../services/whatsappService");
+const { findProductMatch } = require("../utils/productMatcher");
 
 // ===============================
 // 🔹 VERIFY WEBHOOK (GET)
@@ -32,7 +33,7 @@ const handleWebhook = async (req, res) => {
     console.log("🔥 WEBHOOK EVENT RECEIVED");
     console.log("=================================");
 
-    // ✅ Respond immediately (VERY IMPORTANT)
+    // ✅ Respond immediately (CRITICAL)
     res.sendStatus(200);
 
     const entry = req.body.entry?.[0];
@@ -76,18 +77,36 @@ const handleWebhook = async (req, res) => {
     console.log("💬 User Message:", userText);
 
     // ===============================
-    // 🔹 GENERATE AI RESPONSE
+    // 🔹 PRODUCT MATCHING ENGINE
     // ===============================
-    const aiReply = await generateAIResponse(userText);
+    const matchedProduct = findProductMatch(userText);
 
-    console.log("🤖 AI Reply:", aiReply);
+    let finalReply = "";
+
+    if (matchedProduct) {
+      console.log("🛒 Product Match Found:", matchedProduct.name);
+
+      finalReply = `✅ *${matchedProduct.name}*
+
+💰 Price: ${matchedProduct.price}
+
+🔗 Order Now:
+${matchedProduct.link}
+
+Need help with installation or compatibility? Let me know 👍`;
+    } else {
+      console.log("🤖 No product match → using AI");
+
+      const aiReply = await generateAIResponse(userText);
+      finalReply = aiReply;
+    }
 
     // ===============================
     // 🔹 SEND WHATSAPP MESSAGE
     // ===============================
     console.log("🚀 BEFORE SEND");
 
-    const result = await sendTextMessage(from, aiReply);
+    const result = await sendTextMessage(from, finalReply);
 
     console.log("📤 SEND RESULT:", result);
     console.log("✅ AFTER SEND");
@@ -115,12 +134,12 @@ const generateAIResponse = async (userMessage) => {
             content: `
 You are a professional automotive assistant for ndestore.com (Pakistan).
 
-Your job:
+Your goals:
 - Help users find correct car parts
-- Ask relevant questions (car make, model, year, engine)
-- Recommend products (air filters, oil filters, brake pads, etc.)
+- Ask for missing info (car model, year, engine)
+- Recommend relevant products
 - Keep replies short, clear, and sales-focused
-- Suggest ordering from ndestore.com when relevant
+- Encourage ordering from ndestore.com
             `,
           },
           {
@@ -151,7 +170,7 @@ Your job:
 };
 
 // ===============================
-// 🔹 EXPORTS (CRITICAL)
+// 🔹 EXPORTS
 // ===============================
 module.exports = {
   handleWebhook,
