@@ -1,20 +1,33 @@
 const { runFlow } = require("./flowPipeline");
 const { sendTextMessage } = require("../services/whatsappService");
 
+// ======================================================
+// ✅ MAIN MESSAGE PIPELINE (FINAL CLEAN VERSION)
+// ======================================================
 async function runMessagePipeline({ from, text }) {
   try {
-    console.log("🧠 Incoming:", text);
+    console.log("💬 USER:", text);
 
-    // STEP 1: DIRECT FLOW (NO AI PARSER)
-    const result = await runFlow({ text, from });
+    // --------------------------------------------------
+    // STEP 1: PASS RAW INPUT TO FLOW (NO AI PARSER)
+    // --------------------------------------------------
+    const result = await runFlow({
+      user: from,
+      text: text || ""
+    });
 
     console.log("📦 Flow Result:", result);
 
+    // --------------------------------------------------
     // STEP 2: SEND RESPONSE
-    if (result?.reply) {
+    // --------------------------------------------------
+    if (result && result.reply) {
       await sendTextMessage(from, result.reply);
     } else {
-      await sendTextMessage(from, "⚠️ No response generated.");
+      await sendTextMessage(
+        from,
+        "⚠️ Unable to process request. Please try again."
+      );
     }
 
   } catch (error) {
@@ -22,7 +35,7 @@ async function runMessagePipeline({ from, text }) {
 
     await sendTextMessage(
       from,
-      "⚠️ Something went wrong. Please try again."
+      "⚠️ System error. Please try again later."
     );
   }
 }
