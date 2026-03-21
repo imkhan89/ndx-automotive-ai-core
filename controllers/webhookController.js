@@ -1,5 +1,4 @@
 const { sendTextMessage } = require("../services/whatsappService");
-// (Optional - enable later)
 // const { processUserMessage } = require("./aiController");
 
 async function handleWebhook(req, res) {
@@ -8,18 +7,18 @@ async function handleWebhook(req, res) {
     console.log("🔥 WEBHOOK EVENT RECEIVED");
     console.log("=================================");
 
-    // ✅ Always respond to Meta FIRST (avoid timeout)
+    // ✅ Respond immediately to Meta (CRITICAL)
     res.sendStatus(200);
 
     const entry = req.body.entry?.[0];
     const changes = entry?.changes?.[0];
     const value = changes?.value;
 
-    // Debug full payload (VERY IMPORTANT during testing)
+    // ✅ Debug full payload
     console.log("📦 FULL PAYLOAD:");
     console.log(JSON.stringify(req.body, null, 2));
 
-    // If no messages (delivery/read events etc.)
+    // ❌ No user message (delivery/read event)
     if (!value?.messages) {
       console.log("ℹ️ No user message (status update event)");
       return;
@@ -36,13 +35,13 @@ async function handleWebhook(req, res) {
     let userText = "";
 
     // =====================================================
-    // ✅ HANDLE DIFFERENT MESSAGE TYPES
+    // ✅ HANDLE MESSAGE TYPES
     // =====================================================
 
     if (messageType === "text") {
-      userText = message.text.body;
+      userText = message.text?.body || "";
     } else if (messageType === "button") {
-      userText = message.button.text;
+      userText = message.button?.text || "";
     } else if (messageType === "interactive") {
       userText =
         message.interactive?.button_reply?.title ||
@@ -55,21 +54,26 @@ async function handleWebhook(req, res) {
     console.log("💬 User Message:", userText);
 
     // =====================================================
-    // ✅ SIMPLE TEST REPLY (CONFIRM SYSTEM WORKING)
+    // ✅ DEBUG SEND (UPDATED AS REQUESTED)
     // =====================================================
 
-    await sendTextMessage(
+    console.log("🚀 BEFORE SEND");
+
+    const result = await sendTextMessage(
       from,
-      `✅ Received: ${userText}`
+      `✅ TEST MESSAGE`
     );
 
+    console.log("📤 SEND RESULT:", result);
+    console.log("✅ AFTER SEND");
+
     // =====================================================
-    // 🚀 NEXT (UNCOMMENT WHEN READY)
+    // 🚀 FUTURE AI FLOW
     // =====================================================
     // await processUserMessage(from, userText);
 
   } catch (error) {
-    console.error("❌ WEBHOOK ERROR:", error);
+    console.error("❌ WEBHOOK ERROR:", error.response?.data || error.message || error);
   }
 }
 
