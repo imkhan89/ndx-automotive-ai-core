@@ -1,4 +1,5 @@
-const { runMessagePipeline } = require("../orchestration/messagePipeline");
+const { processQuery } = require("../core/queryEngine");
+const { sendWhatsAppMessage } = require("../services/whatsappService");
 
 module.exports = {
 
@@ -17,16 +18,16 @@ module.exports = {
 
       console.log("💬 USER:", text);
 
-      await runMessagePipeline({
-        from,
-        text
-      });
+      // 🔥 NEW PIPELINE (REPLACES orchestration)
+      const result = await processQuery(text);
 
-      res.sendStatus(200);
+      await sendWhatsAppMessage(from, result.reply);
+
+      return res.sendStatus(200);
 
     } catch (error) {
       console.error("Webhook Error:", error);
-      res.sendStatus(500);
+      return res.sendStatus(500);
     }
   }
 
