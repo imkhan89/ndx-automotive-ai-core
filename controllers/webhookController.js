@@ -1,5 +1,5 @@
 const { processQuery } = require("../core/queryEngine");
-const sendWhatsAppMessage = require("../services/whatsappService");
+const { sendWhatsAppMessage } = require("../services/whatsappService");
 
 exports.handleWebhook = async (req, res) => {
   try {
@@ -14,15 +14,17 @@ exports.handleWebhook = async (req, res) => {
 
     console.log("💬 Incoming:", text);
 
-    // ✅ Use query engine
+    // 🔹 Process via Query Engine
     const result = await processQuery(text);
 
     let reply = "";
 
+    // 🔹 Greeting / normal text
     if (result.type === "text") {
       reply = result.reply;
     }
 
+    // 🔹 Product search response
     if (result.type === "product_search") {
       const data = result.data;
 
@@ -31,15 +33,20 @@ exports.handleWebhook = async (req, res) => {
 🔧 Part: ${data.part || "Not detected"}
 
 📍 Position:
-Front: ${data.position.front}
-Rear: ${data.position.rear}
-Left: ${data.position.left}
-Right: ${data.position.right}
+Front: ${data.position?.front || false}
+Rear: ${data.position?.rear || false}
+Left: ${data.position?.left || false}
+Right: ${data.position?.right || false}
+Upper: ${data.position?.upper || false}
+Lower: ${data.position?.lower || false}
+Inner: ${data.position?.inner || false}
+Outer: ${data.position?.outer || false}
 
 ❌ No Product Found
 `;
     }
 
+    // 🔹 Send reply
     await sendWhatsAppMessage(from, reply);
 
     res.sendStatus(200);
