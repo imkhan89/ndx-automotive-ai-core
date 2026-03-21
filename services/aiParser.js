@@ -1,39 +1,116 @@
+// FILE: services/aiParser.js
+
 const OpenAI = require("openai");
 
+// 🔐 INIT OPENAI
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY
 });
 
-async function parseUserInput(message) {
+// ==============================
+// 🧠 MAIN AI PARSER FUNCTION
+// ==============================
+async function aiParser(message) {
   try {
+    if (!message) {
+      return null;
+    }
+
+    // 🔥 PROMPT (STRICT JSON OUTPUT)
+    const prompt = `
+Extract automotive details from the user query.
+
+Return ONLY JSON. No explanation.
+
+Format:
+{
+  "make": "",
+  "model": "",
+  "part": ""
+}
+
+Examples:
+Input: Toyota Corolla air filter
+Output:
+{
+  "make": "Toyota",
+  "model": "Corolla",
+  "part": "air filter"
+}
+
+Input: Honda Civic brake pads
+Output:
+{
+  "make": "Honda",
+  "model": "Civic",
+  "part": "brake pad"
+}
+
+Now extract:
+
+Input: ${message}
+`;
+
+    // 🔥 OPENAI CALL
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content:
-            "Extract car make, model, year (if any), and part. Return ONLY valid JSON.",
+          content: "You are an automotive parts assistant. Always return valid JSON only."
         },
         {
           role: "user",
-          content: message,
-        },
+          content: prompt
+        }
       ],
-      temperature: 0,
+      temperature: 0
     });
 
-    let text = response.choices[0].message.content;
+    let content = response.choices[0].message.content;
 
-    console.log("RAW AI RESPONSE:", text);
+    // ==============================
+    // 🔧 CLEAN RESPONSE (IMPORTANT)
+    // ==============================
 
-    // 🔥 CLEAN RESPONSE (IMPORTANT)
-    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    // Remove markdown if exists
+    content = content.replace(/```json/g, "").replace(/```/g, "").trim();
 
-    return JSON.parse(text);
+    // ==============================
+    // 🔍 PARSE JSON SAFELY
+    // ==============================
+
+    let parsed;
+
+    try {
+      parsed = JSON.parse(content);
+    } catch (err) {
+      console.error("❌ JSON Parse Error:", content);
+      return null;
+    }
+
+    // ==============================
+    // ✅ VALIDATION
+    // ==============================
+
+    if (!parsed.make || !parsed.model || !parsed.part) {
+      console.log("⚠️ Incomplete AI data:", parsed);
+      return null;
+    }
+
+    return {
+      make: parsed.make.trim(),
+      model: parsed.model.trim(),
+      part: parsed.part.toLowerCase().trim()
+    };
+
   } catch (error) {
-    console.error("AI Parser Error:", error.message);
+    console.error("❌ AI Parser Error:", error);
     return null;
   }
 }
 
-module.exports = { parseUserInput };
+// ==============================
+// EXPORT (CRITICAL FIX)
+// ==============================
+module.exports = aiParser;
