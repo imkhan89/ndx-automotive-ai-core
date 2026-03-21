@@ -5,21 +5,21 @@ const { sendTextMessage } = require("../services/whatsappService");
 
 async function runMessagePipeline({ from, text }) {
   try {
-    // 🔹 STEP 1: Normalize input (AI layer)
+    // 🔹 STEP 1: Normalize input
     text = normalize(text || "");
 
-    // 🔹 STEP 2: Route message (state-first system)
+    console.log("🧠 Routing message:", text);
+
+    // 🔹 STEP 2: Route via flow system
     const result = await flowRouter.route({
       user: from,
       text
     });
 
-    // 🔹 STEP 3: Send response ONLY if router returns reply
+    // 🔹 STEP 3: Send ONLY if router returns reply
     if (result && result.reply) {
       await sendTextMessage(from, result.reply);
     }
-
-    // 🔹 If result is null → flow already handled response
 
   } catch (error) {
     console.error("Pipeline Error:", error);
