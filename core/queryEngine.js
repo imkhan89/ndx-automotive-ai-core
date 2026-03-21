@@ -1,21 +1,25 @@
-const parseQuery = require("../ai/queryParser");
+const { processQuery } = require("../engine/processors/queryProcessor");
 
-async function processQuery(message, state = {}) {
+const runQueryEngine = async (text) => {
+  try {
+    const result = processQuery(text);
 
-  // 🔴 FIRST TIME USER → ALWAYS SHOW MENU
-  if (!state.step) {
-    return {
-      type: "menu"
-    };
+    console.log("🧠 ENGINE RESULT:", result);
+
+    if (!result.found) {
+      return "❌ Sorry, we couldn't find the exact part.\nPlease share vehicle + part name.";
+    }
+
+    const product = result.product;
+
+    return `✅ *${product.name}*\n💰 Price: ${product.price}\n🚗 Vehicle: ${product.vehicle}`;
+    
+  } catch (err) {
+    console.error("QueryEngine Error:", err);
+    return "⚠️ System error. Please try again.";
   }
+};
 
-  // 🔹 AFTER menu → allow AI
-  const parsed = await parseQuery(message);
-
-  return {
-    type: "product_search",
-    data: parsed
-  };
-}
-
-module.exports = { processQuery };
+module.exports = {
+  runQueryEngine
+};
