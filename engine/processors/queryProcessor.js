@@ -1,18 +1,18 @@
-const { detectIntent, extractEntities } = require("../semantic/intentMapper");
-const { findProductMatch } = require("../../utils/productMatcher");
+const { detectIntent } = require("../semantic/intentMapper");
 
+// ✅ MAIN QUERY PROCESSOR
 const processQuery = (text = "") => {
-  const intent = detectIntent(text);
+  console.log("📥 Processing Query:", text);
 
-  const entities = extractEntities(text);
+  // 🔥 STEP 1: Detect Intent
+  const intentData = detectIntent(text);
 
-  const product = findProductMatch(entities.normalized);
+  console.log("🧠 Intent Result:", intentData);
 
+  // 🔥 STEP 2: Build Response Object
   return {
-    intent,
-    query: entities.normalized,
-    product,
-    found: !!product
+    success: true,
+    data: intentData
   };
 };
 
