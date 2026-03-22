@@ -1,39 +1,26 @@
-const { runMessagePipeline } = require("../orchestration/messagePipeline");
-
-// 🔥 In-memory state (replace with Redis later)
-const userState = {};
+const commandRouter = require('../system/commandRouter');
 
 exports.handleWebhook = async (req, res) => {
-  try {
-    const entry = req.body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const message = changes?.value?.messages?.[0];
+    try {
+        // ✅ ALWAYS respond immediately to Meta
+        res.sendStatus(200);
 
-    if (!message) return res.sendStatus(200);
+        const entry = req.body.entry?.[0];
+        const changes = entry?.changes?.[0];
+        const message = changes?.value?.messages?.[0];
 
-    const from = message.from;
-    const text = message.text?.body || "";
+        if (!message) return;
 
-    console.log("💬 Incoming:", text);
+        const from = message.from;
+        const text = message.text?.body || "";
 
-    // ✅ FIX: Initialize state properly
-    if (!userState[from]) {
-      userState[from] = {};
+        // Process async (AFTER 200 response)
+        await commandRouter.route({
+            from,
+            text
+        });
+
+    } catch (error) {
+        console.error("Webhook Error:", error);
     }
-
-    const state = userState[from];
-
-    // ✅ Pass state into pipeline
-    await runMessagePipeline({
-      from,
-      text,
-      state
-    });
-
-    res.sendStatus(200);
-
-  } catch (error) {
-    console.error("❌ Webhook Error:", error.message);
-    res.sendStatus(500);
-  }
 };
