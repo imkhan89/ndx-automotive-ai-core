@@ -1,51 +1,57 @@
 const stateRepo = require("../state/stateRepository");
+const send = require("../services/whatsappService").send;
 
+const mainMenu = require("../interface/templates/mainMenuTemplate");
+
+// Flow entries
 const autoPartsEntry = require("../flows/autoParts/entry");
 
-module.exports = {
+// (Placeholders for future)
+const notImplemented = async (user) => {
+  return send(user, "This section is coming soon.");
+};
 
-  route: async ({ user, text }) => {
+exports.route = async (user, text) => {
 
-    let state = stateRepo.get(user);
+  let state = stateRepo.get(user);
 
-    // FIRST TIME → MENU
-    if (!state) {
-      state = { flow: "main" };
-      stateRepo.set(user, state);
-
-      return {
-        reply: `Main Menu:
-
-1. Auto Parts
-2. Accessories
-3. Decal Stickers
-4. Order Status
-5. Complaint
-6. Chat Support
-
-Reply with number`
-      };
-    }
-
-    // SELECT AUTO PARTS
-    if (text === "1") {
-      state.flow = "autoParts";
-      stateRepo.set(user, state);
-
-      return {
-        reply: "🔍 Enter product (e.g., Corolla air filter)"
-      };
-    }
-
-    // CONTINUE AUTO PARTS FLOW
-    if (state.flow === "autoParts") {
-      return await autoPartsEntry(user, text, state);
-    }
-
-    // FALLBACK
-    return {
-      reply: "⚠️ Invalid option. Reply 1–6"
-    };
+  // 🟢 FIRST TIME USER
+  if (!state) {
+    stateRepo.set(user, { flow: "main" });
+    return send(user, mainMenu());
   }
 
+  // 🟢 IF USER IS IN FLOW → CONTINUE FLOW
+  if (state.flow === "autoParts") {
+    return autoPartsEntry(user, text, state);
+  }
+
+  // 🟡 MAIN MENU HANDLING
+  switch (text) {
+
+    case "1":
+      state.flow = "autoParts";
+      state.step = "category";
+      stateRepo.set(user, state);
+
+      return autoPartsEntry(user, "", state);
+
+    case "2":
+      return notImplemented(user);
+
+    case "3":
+      return notImplemented(user);
+
+    case "4":
+      return notImplemented(user);
+
+    case "5":
+      return notImplemented(user);
+
+    case "6":
+      return notImplemented(user);
+
+    default:
+      return send(user, mainMenu());
+  }
 };
