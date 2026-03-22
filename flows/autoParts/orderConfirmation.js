@@ -1,17 +1,18 @@
 const send = require("../../services/whatsappService").send;
 const stateRepo = require("../../state/stateRepository");
 
-const input = require("../../interface/templates/inputTemplate");
-const error = require("../../interface/templates/errorTemplate");
+const inputTemplate = require("../../interface/templates/inputTemplate");
+const errorTemplate = require("../../interface/templates/errorTemplate");
 
 module.exports = (user, text, state) => {
 
-  if (!text || text.toLowerCase() !== "yes") {
-    return send(user, error.cancelled());
+  if (text.toLowerCase() !== "yes") {
+    return send(user, errorTemplate.cancelled());
   }
 
+  // Move to customer step
   state.step = "customer";
   stateRepo.set(user, state);
 
-  return send(user, input.name());
+  return send(user, inputTemplate.name());
 };
