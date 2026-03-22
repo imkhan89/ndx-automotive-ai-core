@@ -1,26 +1,16 @@
 const send = require("../../services/whatsappService").send;
 const stateRepo = require("../../state/stateRepository");
 
+const inputTemplate = require("../../interface/templates/inputTemplate");
+
 module.exports = (user, text, state) => {
 
-  if (state.step === "category") {
-    state.step = "productType";
-    stateRepo.set(user, state);
+  // Save selected category (default if empty)
+  state.productType = text || "Air Filter";
 
-    return send(user,
-`Select Auto Part:
-1. Air Filter
-2. Oil Filter
-3. Brake Parts`
-    );
-  }
+  // Move to next step
+  state.step = "make";
+  stateRepo.set(user, state);
 
-  if (state.step === "productType") {
-    state.productType = text;
-    state.step = "end";
-
-    stateRepo.set(user, state);
-
-    return send(user, `Selected: ${text}`);
-  }
+  return send(user, inputTemplate.make());
 };
