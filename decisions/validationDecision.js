@@ -1,9 +1,13 @@
-module.exports = (input, optionsLength) => {
+module.exports = (value, type) => {
 
-  const index = Number(input);
+  if (!value) return false;
 
-  if (!index || index < 1 || index > optionsLength) {
-    return false;
+  if (type === "number") {
+    return !isNaN(parseInt(value));
+  }
+
+  if (type === "text") {
+    return value.trim().length > 0;
   }
 
   return true;
