@@ -1,26 +1,25 @@
 const send = require("../../services/whatsappService").send;
 const stateRepo = require("../../state/stateRepository");
 
-const validate = require("../../decisions/validationDecision");
-const confirmTemplate = require("../../interface/templates/confirmationTemplate");
-const error = require("../../interface/templates/errorTemplate");
-const pricing = require("../../decisions/pricingDecision");
+const confirmationTemplate = require("../../interface/templates/confirmationTemplate");
+const errorTemplate = require("../../interface/templates/errorTemplate");
 
 module.exports = (user, text, state) => {
 
-  const valid = validate(text, state.products.length);
+  const index = parseInt(text) - 1;
+  const product = state.products[index];
 
-  if (!valid) {
-    return send(user, error.invalidSelection());
+  // Validation
+  if (!product) {
+    return send(user, errorTemplate.invalidSelection());
   }
 
-  let product = state.products[text - 1];
-
-  product = pricing(user, product);
-
+  // Store selected product
   state.selected = product;
+
+  // Move to next step
   state.step = "confirm";
   stateRepo.set(user, state);
 
-  return send(user, confirmTemplate(product));
+  return send(user, confirmationTemplate(product));
 };
