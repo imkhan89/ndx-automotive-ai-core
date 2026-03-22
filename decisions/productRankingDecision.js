@@ -1,7 +1,14 @@
-module.exports = (products = []) => {
+module.exports = (products, context = {}) => {
 
-  if (!Array.isArray(products)) return [];
+  if (!products || !products.length) return [];
 
-  // MVP logic: limit to top 3
-  return products.slice(0, 3);
+  // Basic ranking (can evolve later)
+  let ranked = [...products];
+
+  // Example logic:
+  // 1. Prioritize cheaper first
+  ranked.sort((a, b) => parseInt(a.price) - parseInt(b.price));
+
+  // 2. Limit results (UX optimization)
+  return ranked.slice(0, 3);
 };
