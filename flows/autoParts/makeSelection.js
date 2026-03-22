@@ -1,12 +1,16 @@
 const send = require("../../services/whatsappService").send;
 const stateRepo = require("../../state/stateRepository");
-const input = require("../../interface/templates/inputTemplate");
+const inputTemplate = require("../../interface/templates/inputTemplate");
 
 module.exports = (user, text, state) => {
 
+  // Store Make
   state.make = text;
+
+  // Move to next step
   state.step = "model";
   stateRepo.set(user, state);
 
-  return send(user, input.model());
+  // UI handled via template
+  return send(user, inputTemplate.model());
 };
