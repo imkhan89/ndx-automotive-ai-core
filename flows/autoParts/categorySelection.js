@@ -1,16 +1,21 @@
 const send = require("../../services/whatsappService").send;
 const stateRepo = require("../../state/stateRepository");
 
-const inputTemplate = require("../../interface/templates/inputTemplate");
-
 module.exports = (user, text, state) => {
 
-  // Save selected category (default if empty)
-  state.productType = text || "Air Filter";
-
-  // Move to next step
-  state.step = "make";
+  // Move directly to free text mode
+  state.step = "freeText";
   stateRepo.set(user, state);
 
-  return send(user, inputTemplate.make());
+  return send(user,
+`Share Auto Parts Inquiry in the following format:
+
+Part Name:
+Vehicle Make:
+Model Name:
+Model Year:
+
+Example:
+Air Filter Suzuki Swift 2021`
+  );
 };
