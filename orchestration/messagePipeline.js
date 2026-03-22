@@ -1,53 +1,35 @@
-const { processQuery } = require("../engine/processors/queryProcessor");
-const { whatsappFormatter } = require("../interface/formatters/whatsappFormatter");
-const { sendWhatsAppMessage } = require("../services/whatsappService");
+const stateRepo = require("../state/stateRepository");
+const flowRouter = require("../routers/flowRouter");
+const menuHandler = require("./menuHandler");
 
-// ✅ MAIN PIPELINE
-const runMessagePipeline = async ({ from, text, state = {} }) => {
-  try {
-    console.log("📥 Incoming Message:", text);
-    console.log("📦 Current State:", state);
+const send = require("../services/whatsappService").send;
+const mainMenu = require("../interface/templates/mainMenuTemplate");
 
-    let reply = "";
+exports.execute = async (user, text) => {
 
-    // 🔴 FIRST TIME → SHOW MENU
-    if (!state.step) {
-      reply = whatsappFormatter("menu", null, state);
-    }
+  // Normalize input
+  text = (text || "").trim();
 
-    // 🔴 MENU HANDLING
-    else if (state.step === "menu") {
-      reply = whatsappFormatter("menu_selection", text, state);
-    }
+  let state = stateRepo.get(user);
 
-    // 🔴 AUTO PARTS FLOW
-    else if (state.step === "auto_parts") {
-
-      const result = processQuery(text);
-      const data = result.data || {};
-
-      reply = whatsappFormatter("product_result", data, state);
-    }
-
-    // 🔹 SEND MESSAGE
-    await sendWhatsAppMessage(from, reply);
-
-    console.log("✅ Reply Sent:", reply);
-
-    return true;
-
-  } catch (error) {
-    console.error("❌ Pipeline Error:", error);
-
-    await sendWhatsAppMessage(
-      from,
-      "⚠️ Sorry, something went wrong. Please try again."
-    );
-
-    return false;
+  // 🟢 FIRST TIME USER → SHOW MENU
+  if (!state) {
+    state = { flow: "main" };
+    stateRepo.set(user, state);
+    return send(user, mainMenu());
   }
-};
 
-module.exports = {
-  runMessagePipeline
+  // 🔴 GLOBAL INTERRUPTS (OPTIONAL SAFE HOOK)
+  if (text === "#" || text.toLowerCase() === "menu") {
+    stateRepo.set(user, { flow: "main" });
+    return send(user, mainMenu());
+  }
+
+  // 🟡 IF USER IS INSIDE FLOW → FLOW OWNS INPUT
+  if (state.flow !== "main") {
+    return flowRouter.route(user, text);
+  }
+
+  // 🔵 OTHERWISE → MENU HANDLER
+  return menuHandler(user, text, state);
 };
