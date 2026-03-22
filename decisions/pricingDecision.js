@@ -1,15 +1,7 @@
-const { isInternational } = require("../utils/countryDetector");
-
-module.exports = (user, product) => {
+module.exports = (product, user) => {
 
   if (!product) return product;
 
-  const intl = isInternational(user);
-
-  return {
-    ...product,
-    displayPrice: intl
-      ? `$${product.usdPrice || product.price}`
-      : `Rs. ${product.price}`
-  };
+  // Future: currency logic, discounts, intl pricing
+  return product;
 };
